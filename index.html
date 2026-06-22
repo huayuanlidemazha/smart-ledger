@@ -78,16 +78,19 @@
     .filebox input { position: absolute; inset: 0; opacity: 0; }
 
     canvas { width: 100%; height: 230px; display: block; padding: 8px 12px 16px; }
-    .list { padding: 6px 10px 12px; }
-    .item { display: grid; grid-template-columns: 42px 1fr auto; gap: 10px; align-items: center; padding: 12px 8px; border-bottom: 1px solid var(--line); }
-    .item:last-child { border-bottom: 0; }
+    .list { padding: 8px 10px 12px; }
+    .item { display: block; padding: 12px; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.42); }
+    .item:last-child { margin-bottom: 0; }
     .item.muted { opacity: .58; }
+    .item-head { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; align-items: center; }
+    .item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .item-note { margin-top: 8px; color: var(--muted); font: 650 12px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; word-break: break-word; }
     .icon { width: 42px; height: 42px; border-radius: 16px; display: grid; place-items: center; background: rgba(211,155,53,.18); font-size: 20px; }
-    .meta b { display: block; font: 850 15px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .meta b { display: block; font: 850 15px/1.25 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; overflow-wrap: anywhere; }
     .meta span { color: var(--muted); font: 650 12px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
-    .money { font: 900 16px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
+    .money { font: 900 17px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; text-align: right; }
     .money.out { color: var(--red); } .money.in { color: var(--green); }
-    .edit-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+    .edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     .empty { padding: 24px 18px 30px; color: var(--muted); text-align: center; font: 650 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
     .guide-list { padding: 4px 18px 18px; }
     .guide-block { margin-top: 12px; padding: 14px; border-radius: 20px; background: rgba(255,255,255,.48); border: 1px solid var(--line); }
@@ -432,14 +435,99 @@
       return parseLines(parseDelimitedRows(text), '????');
     }
 
+    function textOf(value) { return value == null ? '' : String(value).trim(); }
+
+    function hasAny(text, words) { return words.some(word => text.includes(word)); }
+
+    function normalizeHeader(value) {
+      return textOf(value).replace(/[\s\u3000:?()??]/g, '').toLowerCase();
+    }
+
+    function headerField(header) {
+      const h = normalizeHeader(header);
+      if (!h) return '';
+      if (hasAny(h, ['\u65e5\u671f','\u65f6\u95f4','\u4ea4\u6613\u65f6\u95f4','\u521b\u5efa\u65f6\u95f4','\u4ed8\u6b3e\u65f6\u95f4','\u53d1\u751f\u65f6\u95f4','\u5165\u8d26\u65f6\u95f4','\u8bb0\u8d26\u65e5\u671f','date','time'])) return 'date';
+      if (hasAny(h, ['\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u5546\u54c1','\u540d\u79f0','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','description','merchant','memo','name'])) return 'merchant';
+      if (hasAny(h, ['\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
+      if (hasAny(h, ['\u652f\u51fa','\u501f\u65b9','\u4ed8\u6b3e\u91d1\u989d','debit','expense'])) return 'expense';
+      if (hasAny(h, ['\u6536\u5165','\u8d37\u65b9','\u6536\u6b3e\u91d1\u989d','credit','income'])) return 'income';
+      if (hasAny(h, ['\u6536\u652f','\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u65b9\u5411','type'])) return 'type';
+      if (hasAny(h, ['\u652f\u4ed8\u65b9\u5f0f','\u652f\u4ed8\u6e20\u9053','\u6e20\u9053','\u8d26\u6237','\u94f6\u884c\u5361','\u65b9\u5f0f','account','channel'])) return 'channel';
+      if (hasAny(h, ['\u5206\u7c7b','\u7c7b\u522b','category'])) return 'category';
+      return '';
+    }
+
+    function moneyNumber(value) {
+      const raw = textOf(value).replace(/,/g, '');
+      const negative = /^\(.*\)$/.test(raw) || hasAny(raw, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa']);
+      const match = raw.match(/[+-]?\d+(?:\.\d{1,2})?/);
+      if (!match) return 0;
+      const n = Math.abs(Number(match[0]));
+      return negative || match[0].startsWith('-') ? -n : n;
+    }
+
+    function findHeaderRow(rows) {
+      let best = { index: -1, fields: {}, score: 0 };
+      rows.slice(0, 25).forEach((row, index) => {
+        const fields = {};
+        row.forEach((cell, col) => {
+          const field = headerField(cell);
+          if (field && fields[field] == null) fields[field] = col;
+        });
+        const score = Object.keys(fields).length + (fields.amount != null || fields.income != null || fields.expense != null ? 2 : 0) + (fields.date != null ? 1 : 0);
+        if (score > best.score) best = { index, fields, score };
+      });
+      return best.score >= 3 ? best : null;
+    }
+
+    function parseRowsByHeader(rows, source) {
+      const header = findHeaderRow(rows);
+      if (!header) return [];
+      const f = header.fields;
+      return dedupeNewItems(rows.slice(header.index + 1).map(row => {
+        const rowText = row.map(textOf).filter(Boolean).join(' ');
+        const income = f.income != null ? Math.abs(moneyNumber(row[f.income])) : 0;
+        const expense = f.expense != null ? Math.abs(moneyNumber(row[f.expense])) : 0;
+        let amount = f.amount != null ? moneyNumber(row[f.amount]) : 0;
+        const typeText = f.type != null ? textOf(row[f.type]) : rowText;
+        let type = hasAny(typeText, ['\u6536\u5165','\u6536\u6b3e','\u5165\u8d26','\u9000\u6b3e','\u9000\u56de','\u8d37\u65b9','credit','income']) ? 'income' : 'expense';
+        if (income && !expense) { amount = income; type = 'income'; }
+        else if (expense && !income) { amount = expense; type = 'expense'; }
+        else if (amount) {
+          type = amount < 0 || hasAny(typeText, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa','\u501f\u65b9','debit','expense']) ? 'expense' : type;
+          amount = Math.abs(amount);
+        }
+        if (!amount) return null;
+        const isRefund = hasAny(rowText, ['\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
+        const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
+        const categoryText = f.category != null ? textOf(row[f.category]) : '';
+        const category = categories.includes(categoryText) ? categoryText : detectCategory(rowText, isRefund);
+        const channelText = f.channel != null ? textOf(row[f.channel]) : '';
+        return {
+          id: uid(), type, amount, category,
+          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText),
+          merchant, note: rowText, source,
+          time: normalizeDate(textOf(row[f.date]) || rowText) + 'T12:00:00.000Z',
+          isRefund, excluded: false, createdAt: new Date().toISOString()
+        };
+      }).filter(Boolean));
+    }
+
     async function parseXlsxWithSheetJS(file) {
       if (!window.XLSX) throw new Error('SheetJS not loaded');
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const allItems = [];
+      for (const sheetName of workbook.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+        const normalized = rows.map(row => row.map(textOf));
+        const structured = parseRowsByHeader(normalized, `Excel ${sheetName}`);
+        if (structured.length) allItems.push(...structured);
+      }
+      if (allItems.length) return dedupeNewItems(allItems);
       const sheetName = workbook.SheetNames[0];
-      if (!sheetName) throw new Error('No worksheet found');
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
-      const text = rows.map(row => row.map(cell => cell == null ? '' : String(cell).trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n');
+      const text = rows.map(row => row.map(cell => textOf(cell)).filter(Boolean).join(' ')).filter(Boolean).join('\n');
       return parseLines(text, 'Excel XLSX');
     }
 
@@ -531,8 +619,8 @@
     function renderList(data) {
       $('list').innerHTML = data.length ? data.slice(0, 80).map(x => {
         const offseted = state.offsets.some(o => o.status === 'confirmed' && (o.refundId === x.id || o.expenseId === x.id));
-        return `<div class="item ${x.excluded ? 'muted' : ''}"><div class="icon">${symbols[x.category] || '✦'}</div><div class="meta"><b>${escapeHtml(x.merchant)} · ${x.channel}</b><span>${dateLabel(x.time)} · ${x.source || '手动'}${offseted ? ' · 已参与抵消' : ''}</span></div><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>支出</option><option value="income" ${x.type==='income'?'selected':''}>收入</option></select></div></div>`;
-      }).join('') : '<div class="empty">还没有本月账单。月底复制账单文字或导入文件后，会在这里集中校对。</div>';
+        return `<div class="item ${x.excluded ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '?'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} ? ${dateLabel(x.time)} ? ${x.source || '??'}${offseted ? ' ? ?????' : ''}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>??</option><option value="income" ${x.type==='income'?'selected':''}>??</option></select></div></div>`;
+      }).join('') : '<div class="empty">?????????????????????????????</div>';
     }
 
     function renderChart(data) {

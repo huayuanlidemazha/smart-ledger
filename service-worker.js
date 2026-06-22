@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-ledger-pwa-v2';
+﻿const CACHE_NAME = 'smart-ledger-pwa-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -31,3 +31,4 @@ self.addEventListener('fetch', event => {
     }).catch(() => caches.match('./index.html')))
   );
 });
+
