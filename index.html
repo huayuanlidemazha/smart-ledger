@@ -1,0 +1,592 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="月底账本" />
+  <meta name="theme-color" content="#f3ead8" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <title>月底智能账本</title>
+  <style>
+    :root {
+      --ink: #211d16;
+      --muted: #756d60;
+      --paper: #f3ead8;
+      --card: rgba(255, 252, 244, .88);
+      --green: #1f7459;
+      --red: #b84d37;
+      --gold: #d39b35;
+      --blue: #3c6e8f;
+      --line: rgba(33, 29, 22, .12);
+      --shadow: 0 20px 54px rgba(64, 48, 23, .16);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: ui-serif, Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+      background:
+        radial-gradient(circle at 12% 4%, rgba(211, 155, 53, .34), transparent 32%),
+        radial-gradient(circle at 94% 14%, rgba(31, 116, 89, .22), transparent 30%),
+        linear-gradient(135deg, #fbf0d9 0%, #eadfcf 56%, #e5d2bd 100%);
+    }
+
+    .app { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px calc(92px + env(safe-area-inset-bottom)); }
+    header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 8px 2px 18px; animation: rise .55s ease both; }
+    h1 { margin: 0; font-size: clamp(32px, 8vw, 48px); line-height: .96; letter-spacing: -1.4px; }
+    h2 { margin: 0; font-size: 21px; letter-spacing: -.4px; }
+    .label { color: var(--muted); font: 850 12px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: .11em; text-transform: uppercase; }
+    .month-pill, select.month-select { border: 1px solid var(--line); border-radius: 999px; padding: 9px 12px; background: rgba(255,255,255,.42); color: var(--muted); white-space: nowrap; font: 800 13px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    .card { background: var(--card); border: 1px solid rgba(255,255,255,.58); border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(18px); margin-bottom: 16px; overflow: hidden; animation: rise .55s ease both; }
+    .hero { padding: 20px; }
+    .balance { margin-top: 8px; font-size: clamp(42px, 12vw, 66px); letter-spacing: -2px; line-height: .95; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 18px; }
+    .stat { border-radius: 20px; padding: 12px 10px; background: rgba(255,255,255,.48); border: 1px solid var(--line); min-width: 0; }
+    .stat strong { display: block; margin-top: 6px; font: 900 19px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: -.5px; }
+    .income strong { color: var(--green); } .expense strong { color: var(--red); } .offset strong { color: var(--blue); }
+
+    .section-title { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 8px; gap: 12px; }
+    .period-tools { padding: 0 18px 16px; }
+    .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 4px; border-radius: 999px; background: rgba(33,29,22,.07); margin-bottom: 10px; }
+    .period-btn { border: 0; border-radius: 999px; padding: 10px 8px; background: transparent; color: var(--muted); font: 850 13px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: none; }
+    .period-btn.active { background: #fff8ec; color: var(--ink); box-shadow: 0 7px 18px rgba(58,42,21,.10); }
+    .period-row { display: none; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .period-row.active { display: grid; }
+    .range-label { color: var(--muted); font: 750 13px/1.35 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; margin-top: 8px; }
+    .panel { padding: 16px 18px 18px; }
+    input, select, textarea, button { width: 100%; font: 750 16px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    input, select, textarea { border: 1px solid var(--line); background: rgba(255,255,255,.60); border-radius: 18px; padding: 13px 14px; color: var(--ink); outline: none; }
+    textarea { min-height: 145px; resize: vertical; font-weight: 650; line-height: 1.45; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .single { margin-bottom: 10px; }
+    .primary, .secondary, .danger, .tiny { border: 0; border-radius: 19px; padding: 14px 16px; color: #fff8e9; background: linear-gradient(135deg, #232018, #6a4921); box-shadow: 0 14px 30px rgba(58,42,21,.24); font-weight: 900; }
+    .secondary { color: var(--ink); background: rgba(255,255,255,.54); border: 1px dashed rgba(33,29,22,.24); box-shadow: none; }
+    .danger { background: linear-gradient(135deg, #803323, #bd4d37); }
+    .tiny { width: auto; padding: 9px 11px; border-radius: 13px; font-size: 13px; box-shadow: none; }
+    .row-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .hint { margin: 8px 0 0; color: var(--muted); font: 650 13px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .filebox { position: relative; display: block; margin-bottom: 10px; }
+    .filebox input { position: absolute; inset: 0; opacity: 0; }
+
+    canvas { width: 100%; height: 230px; display: block; padding: 8px 12px 16px; }
+    .list { padding: 6px 10px 12px; }
+    .item { display: grid; grid-template-columns: 42px 1fr auto; gap: 10px; align-items: center; padding: 12px 8px; border-bottom: 1px solid var(--line); }
+    .item:last-child { border-bottom: 0; }
+    .item.muted { opacity: .58; }
+    .icon { width: 42px; height: 42px; border-radius: 16px; display: grid; place-items: center; background: rgba(211,155,53,.18); font-size: 20px; }
+    .meta b { display: block; font: 850 15px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .meta span { color: var(--muted); font: 650 12px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .money { font: 900 16px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; }
+    .money.out { color: var(--red); } .money.in { color: var(--green); }
+    .edit-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+    .empty { padding: 24px 18px 30px; color: var(--muted); text-align: center; font: 650 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .guide-list { padding: 4px 18px 18px; }
+    .guide-block { margin-top: 12px; padding: 14px; border-radius: 20px; background: rgba(255,255,255,.48); border: 1px solid var(--line); }
+    .guide-block h3 { margin: 0 0 8px; font: 900 16px/1.25 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .guide-block p, .guide-block li { color: var(--muted); font: 650 13px/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .guide-block p { margin: 0; }
+    .guide-block ol, .guide-block ul { margin: 8px 0 0; padding-left: 20px; }
+    .candidate { margin: 10px 0 0; padding: 13px; border-radius: 18px; background: rgba(60,110,143,.10); border: 1px solid rgba(60,110,143,.20); }
+    .candidate b { display: block; font: 900 15px/1.3 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .candidate p { margin: 6px 0 10px; color: var(--muted); font: 650 13px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    .module { display: none; }
+    .module.active { display: block; animation: rise .35s ease both; }
+    .bottom-nav { position: fixed; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(540px, calc(100% - 22px)); display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 8px; border: 1px solid rgba(255,255,255,.62); border-radius: 24px; background: rgba(255, 252, 244, .88); box-shadow: 0 18px 42px rgba(64,48,23,.20); backdrop-filter: blur(18px); z-index: 10; }
+    .nav-btn { border: 0; border-radius: 17px; padding: 8px 4px; background: transparent; color: var(--muted); font: 850 11px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: none; }
+    .nav-btn span { display: block; font-size: 18px; margin-bottom: 3px; }
+    .nav-btn.active { background: #fff8ec; color: var(--ink); box-shadow: 0 8px 18px rgba(58,42,21,.12); }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div><div class="label">Smart Ledger</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1></div>
+      <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
+    </header>
+
+    <section class="module active" id="module-overview">
+      <section class="card hero">
+        <div class="label">&#32479;&#35745;&#21306;&#38388;&#20928;&#32467;&#20313;</div>
+        <div class="balance" id="balance">&yen;0</div>
+        <div class="stats">
+          <div class="stat income"><span class="label">&#25910;&#20837;</span><strong id="income">&yen;0</strong></div>
+          <div class="stat expense"><span class="label">&#25903;&#20986;</span><strong id="expense">&yen;0</strong></div>
+          <div class="stat offset"><span class="label">&#24050;&#25269;&#28040;</span><strong id="offset">&yen;0</strong></div>
+        </div>
+        <p class="hint" id="summaryHint">&#21487;&#20197;&#26597;&#30475;&#26376;&#24230;&#12289;&#24180;&#24230;&#25110;&#33258;&#23450;&#20041;&#26102;&#38388;&#27573;&#65307;&#36864;&#27454;&#25269;&#28040;&#24517;&#39035;&#25163;&#21160;&#30830;&#35748;&#12290;</p>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>&#26102;&#38388;&#33539;&#22260;</h2><span class="label">&#24555;&#36895;&#20999;&#25442;</span></div>
+        <div class="period-tools">
+          <div class="segmented">
+            <button class="period-btn active" type="button" data-period="month">&#26376;&#24230;</button>
+            <button class="period-btn" type="button" data-period="year">&#24180;&#24230;</button>
+            <button class="period-btn" type="button" data-period="custom">&#33258;&#23450;&#20041;</button>
+          </div>
+          <div class="period-row active" id="period-month-row">
+            <input id="monthInput" type="month" />
+          </div>
+          <div class="period-row" id="period-year-row">
+            <input id="yearInput" type="number" min="2000" max="2100" step="1" placeholder="Year" />
+          </div>
+          <div class="period-row" id="period-custom-row">
+            <input id="startDateInput" type="date" />
+            <input id="endDateInput" type="date" />
+          </div>
+          <div class="range-label" id="rangeLabel">&#24403;&#21069;&#32479;&#35745;&#65306;&#26412;&#26376;</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>&#20998;&#31867;&#22270;</h2><span class="label">&#25269;&#28040;&#21518;</span></div>
+        <canvas id="chart" width="640" height="330"></canvas>
+      </section>
+    </section>
+
+    <section class="module" id="module-import">
+      <section class="card">
+        <div class="section-title"><h2>&#25209;&#37327;&#23548;&#20837;</h2><span class="label">&#19968;&#27425;&#25972;&#29702;</span></div>
+        <div class="panel">
+          <div class="single"><textarea id="bulkText" placeholder="Paste WeChat / Alipay / bank bill text here, one transaction per line is best.
+06-03 12:31 WeChat Starbucks -36.80
+06-05 09:12 Alipay Salary +12000
+06-08 18:20 Meituan refund +28.00"></textarea></div>
+          <div class="grid">
+            <button class="primary" id="parseTextBtn" type="button">&#35782;&#21035;&#31896;&#36148;&#20869;&#23481;</button>
+            <button class="secondary" id="sampleBtn" type="button">&#22635;&#20837;&#31034;&#20363;</button>
+          </div>
+          <label class="filebox">
+            <button class="secondary" type="button">&#23548;&#20837; CSV / &#25991;&#26412;&#36134;&#21333;</button>
+            <input id="billFile" type="file" accept=".csv,.txt,text/csv,text/plain" />
+          </label>
+          <label class="filebox">
+            <button class="secondary" type="button">&#23548;&#20837;&#36134;&#21333;&#25130;&#22270;</button>
+            <input id="imageFile" type="file" accept="image/*" multiple />
+          </label>
+          <p class="hint">&#25130;&#22270;&#35782;&#21035;&#20250;&#20248;&#20808;&#23581;&#35797;&#27983;&#35272;&#22120;&#33258;&#24102;&#25991;&#23383;&#35782;&#21035;&#65307;&#22914;&#26524;&#24403;&#21069; iPhone/Safari &#19981;&#25903;&#25345;&#65292;&#35831;&#22312;&#29031;&#29255;&#37324;&#29992;&#8220;&#23454;&#20917;&#25991;&#26412;&#8221;&#22797;&#21046;&#36134;&#21333;&#25991;&#23383;&#65292;&#20877;&#31896;&#36148;&#21040;&#19978;&#26041;&#12290;</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="module" id="module-offsets">
+      <section class="card" id="candidateCard">
+        <div class="section-title"><h2>&#24453;&#30830;&#35748;&#25269;&#28040;</h2><span class="label" id="candidateCount">0 &#39033;</span></div>
+        <div class="panel" id="candidateList"></div>
+      </section>
+    </section>
+
+    <section class="module" id="module-records">
+      <section class="card">
+        <div class="section-title"><h2>&#35782;&#21035;&#35760;&#24405;</h2><span class="label" id="countLabel">0 &#31508;</span></div>
+        <div class="list" id="list"></div>
+      </section>
+    </section>
+
+
+    <section class="module" id="module-guide">
+      <section class="card">
+        <div class="section-title"><h2>&#20351;&#29992;&#25351;&#21335;</h2><span class="label">iPhone</span></div>
+        <div class="guide-list">
+          <div class="guide-block">
+            <h3>&#26159;&#21542;&#38656;&#35201;&#32852;&#32593;&#25110; API&#65311;</h3>
+            <p>&#19981;&#38656;&#35201;&#35843;&#29992; API&#65292;&#20063;&#19981;&#38656;&#35201;&#25226;&#36134;&#21333;&#19978;&#20256;&#21040;&#26381;&#21153;&#22120;&#12290;&#36825;&#20010;&#29256;&#26412;&#26159;&#26412;&#22320;&#33258;&#29992;&#24037;&#20855;&#65306;&#35782;&#21035;&#12289;&#20998;&#31867;&#12289;&#25269;&#28040;&#30830;&#35748;&#21644;&#25253;&#34920;&#37117;&#22312;&#26412;&#26426;&#23436;&#25104;&#65292;&#25968;&#25454;&#20445;&#23384;&#22312;&#27983;&#35272;&#22120;&#26412;&#22320;&#23384;&#20648;&#20013;&#12290;</p>
+          </div>
+          <div class="guide-block">
+            <h3>PWA &#20027;&#23631;&#24149;&#23433;&#35013;</h3>
+            <ol>
+              <li>&#25226;&#25972;&#20010; pwa &#25991;&#20214;&#22841;&#19978;&#20256;&#21040;&#19968;&#20010; HTTPS &#38745;&#24577;&#32593;&#39029;&#22320;&#22336;&#65292;&#25110;&#32773;&#29992;&#20320;&#33258;&#24049;&#30340;&#23616;&#22495;&#32593;&#26381;&#21153;&#22120;&#25171;&#24320;&#12290;</li>
+              <li>&#29992; iPhone Safari &#35775;&#38382;&#35813;&#22320;&#22336;&#65292;&#28857;&#20987;&#20998;&#20139;&#25353;&#38062;&#12290;</li>
+              <li>&#36873;&#25321;&#8220;&#28155;&#21152;&#21040;&#20027;&#23631;&#24149;&#8221;&#65292;&#20445;&#23384;&#21518;&#23601;&#20250;&#20986;&#29616;&#19968;&#20010;&#8220;&#26234;&#33021;&#36134;&#26412;&#8221;&#22270;&#26631;&#12290;</li>
+              <li>&#20174;&#20027;&#23631;&#24149;&#25171;&#24320;&#21518;&#65292;&#20250;&#20197;&#25509;&#36817; App &#30340;&#26041;&#24335;&#36816;&#34892;&#65292;&#24182;&#25903;&#25345;&#31163;&#32447;&#25171;&#24320;&#24050;&#32531;&#23384;&#30340;&#39029;&#38754;&#12290;</li>
+            </ol>
+            <p style="margin-top:8px">&#27880;&#24847;&#65306;&#30452;&#25509;&#29992; file:// &#25171;&#24320; HTML &#26102;&#65292;PWA &#31163;&#32447;&#32531;&#23384;&#21644;&#28155;&#21152;&#21040;&#20027;&#23631;&#24149;&#33021;&#21147;&#20250;&#21463;&#38480;&#65307;&#24314;&#35758;&#29992; HTTPS &#22320;&#22336;&#35775;&#38382;&#12290;</p>
+          </div>
+          <div class="guide-block">
+            <h3>&#26368;&#31616;&#21333;&#30340;&#31163;&#32447;&#29992;&#27861;</h3>
+            <ol>
+              <li>&#25226; smart-ledger.html &#21457;&#21040;&#20320;&#30340; iPhone&#65292;&#27604;&#22914;&#29992; iCloud Drive&#12289;&#38548;&#31354;&#25237;&#36865;&#12289;&#24494;&#20449;&#25991;&#20214;&#25110;&#37038;&#31665;&#12290;</li>
+              <li>&#22312; iPhone &#30340;&#8220;&#25991;&#20214;&#8221;App &#37324;&#25214;&#21040;&#36825;&#20010; HTML &#25991;&#20214;&#24182;&#25171;&#24320;&#12290;</li>
+              <li>&#22914;&#26524;&#31995;&#32479;&#25552;&#31034;&#36873;&#25321;&#25171;&#24320;&#26041;&#24335;&#65292;&#36873;&#25321; Safari &#25110;&#27983;&#35272;&#22120;&#25171;&#24320;&#12290;</li>
+              <li>&#25353;&#24179;&#26102;&#27969;&#31243;&#23548;&#20837;&#36134;&#21333;&#12289;&#20462;&#25913;&#20998;&#31867;&#12289;&#30830;&#35748;&#25269;&#28040;&#21363;&#21487;&#12290;</li>
+            </ol>
+          </div>
+          <div class="guide-block">
+            <h3>&#26356;&#20687; App &#30340;&#29992;&#27861;</h3>
+            <ol>
+              <li>&#22914;&#26524;&#20320;&#24819;&#35201;&#20027;&#23631;&#24149;&#22270;&#26631;&#65292;&#26368;&#31283;&#30340;&#26041;&#24335;&#26159;&#25226;&#36825;&#20010;&#25991;&#20214;&#25918;&#21040;&#19968;&#20010;&#31169;&#20154;&#32593;&#39029;&#22320;&#22336;&#25110;&#23616;&#22495;&#32593;&#22320;&#22336;&#12290;</li>
+              <li>&#29992; Safari &#25171;&#24320;&#35813;&#22320;&#22336;&#21518;&#65292;&#28857;&#20987;&#20998;&#20139;&#25353;&#38062;&#65292;&#36873;&#25321;&#8220;&#28155;&#21152;&#21040;&#20027;&#23631;&#24149;&#8221;&#12290;</li>
+              <li>&#20043;&#21518;&#23601;&#21487;&#20197;&#20687;&#25171;&#24320; App &#19968;&#26679;&#20174;&#20027;&#23631;&#24149;&#36827;&#20837;&#12290;</li>
+            </ol>
+          </div>
+          <div class="guide-block">
+            <h3>&#25968;&#25454;&#22312;&#21738;&#37324;&#65311;</h3>
+            <p>&#25968;&#25454;&#20445;&#23384;&#22312;&#24403;&#21069;&#27983;&#35272;&#22120;&#30340;&#26412;&#22320;&#23384;&#20648;&#37324;&#12290;&#22914;&#26524;&#26356;&#25442;&#27983;&#35272;&#22120;&#12289;&#28165;&#38500;&#32593;&#31449;&#25968;&#25454;&#25110;&#25442;&#25163;&#26426;&#65292;&#21487;&#33021;&#20250;&#20002;&#22833;&#35760;&#24405;&#12290;&#24314;&#35758;&#27599;&#26376;&#23548;&#20986;&#19968;&#27425;&#22791;&#20221;&#25991;&#20214;&#12290;</p>
+          </div>
+          <div class="guide-block">
+            <h3>&#22791;&#20221;&#19982;&#36801;&#31227;</h3>
+            <p>&#23548;&#20986;&#30340;&#22791;&#20221;&#26159; JSON &#25991;&#20214;&#65292;&#21487;&#20197;&#20445;&#23384;&#21040; iCloud Drive &#25110;&#21457;&#21040;&#33258;&#24049;&#30340;&#30005;&#33041;&#12290;&#25442;&#25163;&#26426;&#12289;&#25442;&#27983;&#35272;&#22120;&#25110;&#37325;&#26032;&#25171;&#24320;&#25991;&#20214;&#21518;&#65292;&#29992;&#8220;&#23548;&#20837;&#22791;&#20221;&#8221;&#24674;&#22797;&#21363;&#21487;&#12290;</p>
+            <div class="grid" style="margin-top:10px">
+              <button class="primary" id="exportBackupBtn" type="button">&#23548;&#20986;&#22791;&#20221;</button>
+              <label class="filebox" style="margin:0">
+                <button class="secondary" type="button">&#23548;&#20837;&#22791;&#20221;</button>
+                <input id="backupFile" type="file" accept="application/json,.json" />
+              </label>
+            </div>
+          </div>
+          <div class="guide-block">
+            <h3>&#33021;&#20570;&#25104;&#23433;&#35013;&#21253;&#21527;&#65311;</h3>
+            <p>iPhone &#19981;&#25903;&#25345;&#20687; Android APK &#37027;&#26679;&#30452;&#25509;&#23433;&#35013;&#20219;&#24847;&#25991;&#20214;&#12290;&#35201;&#20570;&#25104; IPA &#23433;&#35013;&#21253;&#65292;&#38656;&#35201; Mac&#12289;Xcode &#21644; Apple &#31614;&#21517;&#65307;&#33258;&#29992;&#23433;&#35013;&#36890;&#24120;&#38656;&#35201;&#20351;&#29992;&#24320;&#21457;&#32773;&#31614;&#21517;&#25110;&#20391;&#36733;&#24037;&#20855;&#12290;&#26356;&#36731;&#37327;&#30340;&#26041;&#24335;&#26159;&#20570;&#25104; Safari &#20027;&#23631;&#24149; Web App&#12290;</p>
+          </div>
+          <div class="guide-block">
+            <h3>&#25512;&#33616;&#30340;&#26376;&#24230;&#20351;&#29992;&#27969;&#31243;</h3>
+            <ol>
+              <li>&#26376;&#24213;&#25171;&#24320;&#24494;&#20449;&#12289;&#25903;&#20184;&#23453;&#12289;&#38134;&#34892;&#36134;&#21333;&#12290;</li>
+              <li>&#33021;&#23548;&#20986; CSV / &#25991;&#26412;&#23601;&#23548;&#20837;&#25991;&#20214;&#65307;&#19981;&#33021;&#23548;&#20986;&#23601;&#29992; iPhone &#23454;&#20917;&#25991;&#26412;&#20174;&#25130;&#22270;&#22797;&#21046;&#25991;&#23383;&#12290;</li>
+              <li>&#22312;&#8220;&#23548;&#20837;&#8221;&#37324;&#31896;&#36148;&#25110;&#23548;&#20837;&#65292;&#20877;&#21040;&#8220;&#35760;&#24405;&#8221;&#37324;&#26657;&#23545;&#20998;&#31867;&#12290;</li>
+              <li>&#22312;&#8220;&#25269;&#28040;&#8221;&#37324;&#30830;&#35748;&#36864;&#27454;&#12289;&#32418;&#21253;&#36864;&#22238;&#31561;&#26159;&#21542;&#25269;&#28040;&#12290;</li>
+              <li>&#22238;&#21040;&#8220;&#32479;&#35745;&#8221;&#65292;&#36873;&#25321;&#26376;&#24230;&#12289;&#24180;&#24230;&#25110;&#33258;&#23450;&#20041;&#26102;&#38388;&#27573;&#26597;&#30475;&#25253;&#34920;&#12290;</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <nav class="bottom-nav" aria-label="Ledger navigation">
+      <button class="nav-btn active" type="button" data-module="overview"><span>&#9682;</span>&#32479;&#35745;</button>
+      <button class="nav-btn" type="button" data-module="import"><span>+</span>&#23548;&#20837;</button>
+      <button class="nav-btn" type="button" data-module="offsets"><span>&#8617;</span>&#25269;&#28040;</button>
+      <button class="nav-btn" type="button" data-module="records"><span>&#9776;</span>&#35760;&#24405;</button>
+      <button class="nav-btn" type="button" data-module="guide"><span>?</span>&#25351;&#21335;</button>
+    </nav>
+  </main>
+
+  <script>
+    const storeKey = 'smart-ledger-month-end-v2';
+    const categories = ['餐饮','交通','购物','红包','转账','工资','理财','退款','医疗','住房','娱乐','其他'];
+    const channels = ['微信','支付宝','银行卡','现金','其他'];
+    const symbols = { 餐饮:'🍜', 交通:'🚕', 购物:'🛍️', 红包:'🧧', 转账:'↔️', 工资:'💼', 理财:'📈', 退款:'↩️', 医疗:'💊', 住房:'🏠', 娱乐:'🎬', 其他:'✦' };
+    let state = JSON.parse(localStorage.getItem(storeKey) || '{"items":[],"offsets":[]}');
+    if (!state.items) state.items = [];
+    if (!state.offsets) state.offsets = [];
+    let periodMode = 'month';
+    let selectedMonth = new Date().toISOString().slice(0, 7);
+    let selectedYear = new Date().getFullYear();
+    let customStart = new Date().toISOString().slice(0, 10);
+    let customEnd = new Date().toISOString().slice(0, 10);
+
+    const $ = id => document.getElementById(id);
+    const money = n => '¥' + Number(n || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+    const saveState = () => localStorage.setItem(storeKey, JSON.stringify(state));
+    const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+
+    function normalizeDate(raw) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const text = raw || '';
+      let m = text.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+      if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      m = text.match(/(\d{1,2})[-/.月](\d{1,2})/);
+      if (m) return `${year}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function detectChannel(text) {
+      if (/微信|零钱|财付通/i.test(text)) return '微信';
+      if (/支付宝|花呗|余额宝/i.test(text)) return '支付宝';
+      if (/银行|信用卡|储蓄卡|招商|工商|建设|农业|中国银行|交通银行/i.test(text)) return '银行卡';
+      if (/现金/i.test(text)) return '现金';
+      return '其他';
+    }
+
+    function detectCategory(text, isRefund) {
+      if (isRefund) return '退款';
+      if (/红包|微信红包/i.test(text)) return '红包';
+      if (/餐|饭|咖啡|奶茶|外卖|美团|饿了么|麦当劳|肯德基|星巴克/i.test(text)) return '餐饮';
+      if (/地铁|公交|打车|滴滴|高铁|机票|加油|停车/i.test(text)) return '交通';
+      if (/淘宝|天猫|京东|拼多多|抖音商城|超市|购物|便利店/i.test(text)) return '购物';
+      if (/工资|薪资|奖金|报销/i.test(text)) return '工资';
+      if (/基金|股票|理财|利息|分红/i.test(text)) return '理财';
+      if (/房租|物业|水电|燃气|宽带/i.test(text)) return '住房';
+      if (/医院|药|医保|挂号/i.test(text)) return '医疗';
+      if (/电影|游戏|会员|演出|娱乐/i.test(text)) return '娱乐';
+      if (/转账/i.test(text)) return '转账';
+      return '其他';
+    }
+
+    function parseLines(text, source) {
+      const lines = text.split(/\n|\r|；|;/).map(x => x.trim()).filter(Boolean);
+      const parsed = [];
+      for (const line of lines) {
+        const amounts = [...line.matchAll(/([+-])?\s*(?:¥|￥)?\s*(\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:元|块|rmb)?/ig)];
+        if (!amounts.length) continue;
+        const last = amounts[amounts.length - 1];
+        const sign = last[1] || '';
+        const amount = Number(last[2].replace(/,/g, ''));
+        if (!amount) continue;
+        const isRefund = /退款|退回|冲正|撤销|红包退回|原路退/i.test(line);
+        const incomeWords = /收入|收款|到账|工资|奖金|报销|退款|退回|红包退回|转入|入账/i.test(line);
+        const expenseWords = /支出|付款|支付|消费|扣款|转出|发红包|转账给|付款给/i.test(line);
+        const type = sign === '+' || (incomeWords && sign !== '-') ? 'income' : 'expense';
+        const category = detectCategory(line, isRefund);
+        parsed.push({
+          id: uid(), type, amount, category, channel: detectChannel(line),
+          merchant: cleanMerchant(line), note: line, source,
+          time: normalizeDate(line) + 'T12:00:00.000Z', isRefund,
+          excluded: false, createdAt: new Date().toISOString()
+        });
+      }
+      return dedupeNewItems(parsed);
+    }
+
+    function cleanMerchant(line) {
+      return line
+        .replace(/(20\d{2}[-/.年])?\d{1,2}[-/.月]\d{1,2}(日)?/g, '')
+        .replace(/\d{1,2}:\d{2}(:\d{2})?/g, '')
+        .replace(/[+-]?\s*(¥|￥)?\s*\d+(\.\d{1,2})?\s*(元|块|rmb)?/ig, '')
+        .replace(/微信支付|支付宝|银行卡|收入|支出|付款|消费|到账|退款|退回/g, '')
+        .trim().slice(0, 24) || '未识别商户';
+    }
+
+    function dedupeNewItems(items) {
+      return items.filter(item => !state.items.some(old =>
+        old.time.slice(0,10) === item.time.slice(0,10) &&
+        Math.abs(old.amount - item.amount) < 0.01 &&
+        old.channel === item.channel &&
+        old.note === item.note
+      ));
+    }
+
+    function addItems(items) {
+      if (!items.length) { alert('没有识别到新的账单记录'); return; }
+      state.items.unshift(...items);
+      buildOffsetCandidates(items);
+      selectedMonth = items[0].time.slice(0,7);
+      selectedYear = Number(items[0].time.slice(0,4));
+      if (periodMode === 'month') $('monthInput').value = selectedMonth;
+      if (periodMode === 'year') $('yearInput').value = selectedYear;
+      saveState(); render();
+      alert(`已识别 ${items.length} 笔。分类可以在下方直接修改；退款抵消需要你手动确认。`);
+    }
+
+    function buildOffsetCandidates(newItems) {
+      const all = state.items.concat(newItems);
+      const refunds = newItems.filter(x => x.type === 'income' && (x.isRefund || x.category === '退款' || /退款|退回|红包退回/i.test(x.note)));
+      for (const refund of refunds) {
+        const candidates = all.filter(x => x.type === 'expense' && x.id !== refund.id && x.time.slice(0,7) === refund.time.slice(0,7) && !x.excluded)
+          .map(x => ({ item: x, score: scoreOffset(refund, x) }))
+          .filter(x => x.score >= 2)
+          .sort((a,b) => b.score - a.score);
+        if (!candidates.length) continue;
+        const expense = candidates[0].item;
+        if (state.offsets.some(o => o.refundId === refund.id && o.expenseId === expense.id)) continue;
+        state.offsets.push({ id: uid(), refundId: refund.id, expenseId: expense.id, amount: Math.min(refund.amount, expense.amount), status: 'pending', createdAt: new Date().toISOString() });
+      }
+    }
+
+    function scoreOffset(refund, expense) {
+      let score = 0;
+      if (Math.abs(refund.amount - expense.amount) < 0.01) score += 4;
+      else if (refund.amount < expense.amount) score += 2;
+      if (refund.channel === expense.channel) score += 1;
+      if (refund.merchant && expense.merchant && refund.merchant !== '未识别商户' && expense.merchant.includes(refund.merchant.slice(0,2))) score += 1;
+      const days = Math.abs((new Date(refund.time) - new Date(expense.time)) / 86400000);
+      if (days <= 14) score += 1;
+      return score;
+    }
+
+    function parseCsv(text) {
+      const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+      const joined = rows.map(row => row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).join(' ')).join('\n');
+      return parseLines(joined, '账单文件');
+    }
+
+    async function handleFile(file) {
+      const text = await file.text();
+      addItems(parseCsv(text));
+    }
+
+    async function handleImages(files) {
+      if ('TextDetector' in window) {
+        alert('当前浏览器声称支持图片文字识别，将尝试识别；如果失败，请用 iPhone 照片的实况文本复制后粘贴。');
+      } else {
+        alert(`已选择 ${files.length} 张截图。当前浏览器不支持网页内 OCR：请在照片里长按文字，用“实况文本”复制账单文字，再粘贴到文本框批量识别。`);
+      }
+    }
+
+    function getRange() {
+      if (periodMode === 'year') return { start: `${selectedYear}-01-01`, end: `${selectedYear}-12-31`, label: `${selectedYear} \u5e74` };
+      if (periodMode === 'custom') return { start: customStart, end: customEnd, label: `${customStart} \u81f3 ${customEnd}` };
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const last = new Date(y, m, 0).getDate();
+      return { start: `${selectedMonth}-01`, end: `${selectedMonth}-${String(last).padStart(2,'0')}`, label: `${selectedMonth}` };
+    }
+
+    function inRange(item) {
+      const d = item.time.slice(0, 10);
+      const r = getRange();
+      return d >= r.start && d <= r.end;
+    }
+
+    function rangeItems() { return state.items.filter(inRange); }
+    function confirmedOffsets() { return state.offsets.filter(o => o.status === 'confirmed').filter(o => getItem(o.refundId) && getItem(o.expenseId) && inRange(getItem(o.refundId))); }
+    function getItem(id) { return state.items.find(x => x.id === id); }
+
+    function totals() {
+      const offsets = confirmedOffsets();
+      const refundIds = new Set(offsets.map(o => o.refundId));
+      const offsetAmount = offsets.reduce((s,o) => s + Number(o.amount || 0), 0);
+      const data = rangeItems().filter(x => !x.excluded);
+      const income = data.filter(x => x.type === 'income' && !refundIds.has(x.id)).reduce((s,x) => s + x.amount, 0);
+      const rawExpense = data.filter(x => x.type === 'expense').reduce((s,x) => s + x.amount, 0);
+      const expense = Math.max(0, rawExpense - offsetAmount);
+      return { income, expense, offsetAmount };
+    }
+
+    function syncPeriodInputs() {
+      $('monthInput').value = selectedMonth;
+      $('yearInput').value = selectedYear;
+      $('startDateInput').value = customStart;
+      $('endDateInput').value = customEnd;
+      document.querySelectorAll('.period-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.period === periodMode));
+      document.querySelectorAll('.period-row').forEach(row => row.classList.remove('active'));
+      $(`period-${periodMode}-row`).classList.add('active');
+      const range = getRange();
+      $('rangeLabel').textContent = `\u5f53\u524d\u7edf\u8ba1\uff1a${range.label}`;
+      $('rangePill').textContent = range.label;
+    }
+
+    function render() {
+      syncPeriodInputs();
+      const t = totals();
+      $('income').textContent = money(t.income);
+      $('expense').textContent = money(t.expense);
+      $('offset').textContent = money(t.offsetAmount);
+      $('balance').textContent = money(t.income - t.expense);
+      const data = rangeItems();
+      $('countLabel').textContent = `${data.length} 笔`;
+      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount);
+    }
+
+    function renderCandidates() {
+      const pending = state.offsets.filter(o => o.status === 'pending').filter(o => getItem(o.refundId) && getItem(o.expenseId) && inRange(getItem(o.refundId)));
+      $('candidateCount').textContent = `${pending.length} 项`;
+      $('candidateList').innerHTML = pending.length ? pending.map(o => {
+        const r = getItem(o.refundId), e = getItem(o.expenseId);
+        return `<div class="candidate"><b>是否抵消 ${money(o.amount)} 的退款？</b><p>退款：${r.channel} · ${r.merchant} · ${dateLabel(r.time)} · +${money(r.amount)}<br>原支出：${e.channel} · ${e.merchant} · ${dateLabel(e.time)} · -${money(e.amount)}</p><div class="row-actions"><button class="tiny" onclick="confirmOffset('${o.id}')">确认抵消</button><button class="tiny danger" onclick="ignoreOffset('${o.id}')">不抵消</button></div></div>`;
+      }).join('') : '<div class="empty">没有待确认的退款抵消。识别到退款时，这里会先询问你。</div>';
+    }
+
+    function renderList(data) {
+      $('list').innerHTML = data.length ? data.slice(0, 80).map(x => {
+        const offseted = state.offsets.some(o => o.status === 'confirmed' && (o.refundId === x.id || o.expenseId === x.id));
+        return `<div class="item ${x.excluded ? 'muted' : ''}"><div class="icon">${symbols[x.category] || '✦'}</div><div class="meta"><b>${escapeHtml(x.merchant)} · ${x.channel}</b><span>${dateLabel(x.time)} · ${x.source || '手动'}${offseted ? ' · 已参与抵消' : ''}</span></div><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>支出</option><option value="income" ${x.type==='income'?'selected':''}>收入</option></select></div></div>`;
+      }).join('') : '<div class="empty">还没有本月账单。月底复制账单文字或导入文件后，会在这里集中校对。</div>';
+    }
+
+    function renderChart(data) {
+      const canvas = $('chart'), ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const offsetByExpense = {};
+      for (const o of confirmedOffsets()) offsetByExpense[o.expenseId] = (offsetByExpense[o.expenseId] || 0) + o.amount;
+      const totalsByCat = {};
+      data.filter(x => x.type === 'expense' && !x.excluded).forEach(x => {
+        const net = Math.max(0, x.amount - (offsetByExpense[x.id] || 0));
+        totalsByCat[x.category] = (totalsByCat[x.category] || 0) + net;
+      });
+      const rows = Object.entries(totalsByCat).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]).slice(0, 6);
+      if (!rows.length) { ctx.fillStyle = '#756d60'; ctx.font = '28px Georgia'; ctx.textAlign = 'center'; ctx.fillText('本月还没有可统计支出', canvas.width / 2, 170); return; }
+      const max = Math.max(...rows.map(r => r[1]));
+      rows.forEach(([cat, val], i) => {
+        const y = 40 + i * 46, barW = Math.max(18, val / max * 355);
+        ctx.fillStyle = '#211d16'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`${symbols[cat] || '✦'} ${cat}`, 28, y + 24);
+        ctx.fillStyle = i % 2 ? '#1f7459' : '#d39b35'; roundRect(ctx, 170, y, barW, 28, 14); ctx.fill();
+        ctx.fillStyle = '#211d16'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(money(val), 185 + barW, y + 22);
+      });
+    }
+
+    function updateItem(id, field, value) {
+      const item = getItem(id); if (!item) return;
+      item[field] = value;
+      if (field === 'category') item.isRefund = value === '退款';
+      buildOffsetCandidates([item]); saveState(); render();
+    }
+
+    function confirmOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'confirmed'; saveState(); render(); } }
+    function ignoreOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'ignored'; saveState(); render(); } }
+    window.confirmOffset = confirmOffset; window.ignoreOffset = ignoreOffset; window.updateItem = updateItem;
+
+    function dateLabel(time) { return new Date(time).toLocaleDateString('zh-CN', { month:'2-digit', day:'2-digit' }); }
+    function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+    function exportBackup() {
+      const payload = {
+        app: 'smart-ledger',
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        data: state
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `smart-ledger-backup-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importBackup(file) {
+      try {
+        const parsed = JSON.parse(await file.text());
+        const next = parsed.data || parsed;
+        if (!next || !Array.isArray(next.items) || !Array.isArray(next.offsets)) throw new Error('bad backup');
+        state = { items: next.items, offsets: next.offsets };
+        saveState();
+        $('exportBackupBtn').onclick = exportBackup;
+    $('backupFile').onchange = e => e.target.files[0] && importBackup(e.target.files[0]);
+    render();
+        alert('\u5907\u4efd\u5df2\u5bfc\u5165\uff0c\u7edf\u8ba1\u5df2\u66f4\u65b0\u3002');
+      } catch (error) {
+        alert('\u8fd9\u4e2a\u5907\u4efd\u6587\u4ef6\u65e0\u6cd5\u8bc6\u522b\uff0c\u8bf7\u786e\u8ba4\u662f\u672c App \u5bfc\u51fa\u7684 JSON \u5907\u4efd\u3002');
+      }
+    }
+
+    function showModule(name) {
+      document.querySelectorAll('.module').forEach(el => el.classList.toggle('active', el.id === 'module-' + name));
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.module === name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.onclick = () => showModule(btn.dataset.module));
+    $('parseTextBtn').onclick = () => addItems(parseLines($('bulkText').value, '粘贴文本'));
+    $('sampleBtn').onclick = () => { $('bulkText').value = '06-03 12:31 微信支付 星巴克 -36.80\n06-04 19:08 支付宝 美团外卖 -28.00\n06-08 18:20 美团退款 +28.00\n06-10 09:12 银行 工资到账 +12000\n06-12 20:05 微信 发红包 -88.00\n06-13 10:40 微信 红包退回 +88.00'; };
+    $('billFile').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
+    $('imageFile').onchange = e => e.target.files.length && handleImages([...e.target.files]);
+    document.querySelectorAll('.period-btn').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; render(); });
+    $('monthInput').onchange = e => { selectedMonth = e.target.value || selectedMonth; render(); };
+    $('yearInput').onchange = e => { selectedYear = Number(e.target.value) || selectedYear; render(); };
+    $('startDateInput').onchange = e => { customStart = e.target.value || customStart; if (customEnd < customStart) customEnd = customStart; render(); };
+    $('endDateInput').onchange = e => { customEnd = e.target.value || customEnd; if (customEnd < customStart) customStart = customEnd; render(); };
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>
