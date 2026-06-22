@@ -1,8 +1,9 @@
-const CACHE_NAME = 'smart-ledger-pwa-v1';
+const CACHE_NAME = 'smart-ledger-pwa-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './vendor/xlsx.full.min.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png'

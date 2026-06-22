@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <script src="vendor/xlsx.full.min.js"></script>
   <title>月底智能账本</title>
   <style>
     :root {
@@ -167,8 +168,8 @@
             <button class="secondary" id="sampleBtn" type="button">&#22635;&#20837;&#31034;&#20363;</button>
           </div>
           <label class="filebox">
-            <button class="secondary" type="button">&#23548;&#20837; CSV / &#25991;&#26412;&#36134;&#21333;</button>
-            <input id="billFile" type="file" accept=".csv,.txt,text/csv,text/plain" />
+            <button class="secondary" type="button">&#23548;&#20837; Excel / CSV / &#25991;&#26412;</button>
+            <input id="billFile" type="file" accept=".csv,.txt,.html,.htm,.xls,.xlsx,text/csv,text/plain,text/html" />
           </label>
           <label class="filebox">
             <button class="secondary" type="button">&#23548;&#20837;&#36134;&#21333;&#25130;&#22270;</button>
@@ -247,6 +248,10 @@
           <div class="guide-block">
             <h3>&#33021;&#20570;&#25104;&#23433;&#35013;&#21253;&#21527;&#65311;</h3>
             <p>iPhone &#19981;&#25903;&#25345;&#20687; Android APK &#37027;&#26679;&#30452;&#25509;&#23433;&#35013;&#20219;&#24847;&#25991;&#20214;&#12290;&#35201;&#20570;&#25104; IPA &#23433;&#35013;&#21253;&#65292;&#38656;&#35201; Mac&#12289;Xcode &#21644; Apple &#31614;&#21517;&#65307;&#33258;&#29992;&#23433;&#35013;&#36890;&#24120;&#38656;&#35201;&#20351;&#29992;&#24320;&#21457;&#32773;&#31614;&#21517;&#25110;&#20391;&#36733;&#24037;&#20855;&#12290;&#26356;&#36731;&#37327;&#30340;&#26041;&#24335;&#26159;&#20570;&#25104; Safari &#20027;&#23631;&#24149; Web App&#12290;</p>
+          </div>
+          <div class="guide-block">
+            <h3>Excel &#34920;&#26684;&#23548;&#20837;</h3>
+            <p>&#24403;&#21069;&#31163;&#32447;&#29256;&#24050;&#25903;&#25345;&#30452;&#25509;&#23548;&#20837; .xlsx&#12289;CSV&#12289;TXT&#12289;Excel &#21478;&#23384;&#20026;&#30340; HTML/&#32593;&#39029;&#34920;&#26684;&#12290;.xlsx &#35299;&#26512;&#20351;&#29992;&#24050;&#25171;&#21253;&#21040;&#26412;&#22320;&#30340; SheetJS&#65292;&#22788;&#29702;&#36807;&#31243;&#22312;&#26412;&#26426;&#23436;&#25104;&#65292;&#19981;&#38656;&#35201;&#32852;&#32593;&#65292;&#20063;&#19981;&#20250;&#19978;&#20256;&#36134;&#21333;&#25968;&#25454;&#12290;</p>
           </div>
           <div class="guide-block">
             <h3>&#25512;&#33616;&#30340;&#26376;&#24230;&#20351;&#29992;&#27969;&#31243;</h3>
@@ -405,15 +410,51 @@
       return score;
     }
 
-    function parseCsv(text) {
-      const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
-      const joined = rows.map(row => row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).join(' ')).join('\n');
-      return parseLines(joined, '账单文件');
+    function parseDelimitedRows(text) {
+      return text.split(/\r?\n/).map(row => row.trim()).filter(Boolean).map(row => {
+        if (row.includes('\t')) return row.split('\t').join(' ');
+        return row.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(cell => cell.replace(/^\"|\"$/g, '')).join(' ');
+      }).join('\n');
+    }
+
+    function parseHtmlTable(text) {
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      const rows = [...doc.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim()).filter(Boolean).join(' ')).filter(Boolean);
+      if (rows.length) return rows.join('\n');
+      return doc.body ? doc.body.textContent : text;
+    }
+
+    function parseBillFileText(text, fileName) {
+      const name = (fileName || '').toLowerCase();
+      if (name.endsWith('.html') || name.endsWith('.htm') || name.endsWith('.xls') || /^\s*<(!doctype|html|table)/i.test(text)) {
+        return parseLines(parseHtmlTable(text), 'Excel/????');
+      }
+      return parseLines(parseDelimitedRows(text), '????');
+    }
+
+    async function parseXlsxWithSheetJS(file) {
+      if (!window.XLSX) throw new Error('SheetJS not loaded');
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error('No worksheet found');
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+      const text = rows.map(row => row.map(cell => cell == null ? '' : String(cell).trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n');
+      return parseLines(text, 'Excel XLSX');
     }
 
     async function handleFile(file) {
+      const name = (file.name || '').toLowerCase();
+      if (name.endsWith('.xlsx')) {
+        try {
+          addItems(await parseXlsxWithSheetJS(file));
+        } catch (error) {
+          alert('\u8fd9\u4e2a .xlsx \u6587\u4ef6\u6682\u65f6\u65e0\u6cd5\u89e3\u6790\u3002\u8bf7\u786e\u8ba4 SheetJS \u5df2\u6b63\u786e\u52a0\u8f7d\uff0c\u6216\u5c06\u6587\u4ef6\u53e6\u5b58\u4e3a CSV \u540e\u518d\u5bfc\u5165\u3002');
+        }
+        return;
+      }
       const text = await file.text();
-      addItems(parseCsv(text));
+      addItems(parseBillFileText(text, file.name));
     }
 
     async function handleImages(files) {
