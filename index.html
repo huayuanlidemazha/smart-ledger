@@ -114,7 +114,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1></div>
+      <div><div class="label">Smart Ledger ? v2.0</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.0 ? &#24494;&#20449;&#36134;&#21333;&#34920;&#22836;&#20248;&#21270;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -440,19 +440,22 @@
     function hasAny(text, words) { return words.some(word => text.includes(word)); }
 
     function normalizeHeader(value) {
-      return textOf(value).replace(/[\s\u3000:?()??]/g, '').toLowerCase();
+      return textOf(value).replace(/[\s\u3000:?()??/\\\[\]??]/g, '').toLowerCase();
     }
 
     function headerField(header) {
       const h = normalizeHeader(header);
       if (!h) return '';
-      if (hasAny(h, ['\u65e5\u671f','\u65f6\u95f4','\u4ea4\u6613\u65f6\u95f4','\u521b\u5efa\u65f6\u95f4','\u4ed8\u6b3e\u65f6\u95f4','\u53d1\u751f\u65f6\u95f4','\u5165\u8d26\u65f6\u95f4','\u8bb0\u8d26\u65e5\u671f','date','time'])) return 'date';
-      if (hasAny(h, ['\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u5546\u54c1','\u540d\u79f0','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','description','merchant','memo','name'])) return 'merchant';
-      if (hasAny(h, ['\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
+      if (hasAny(h, ['\u4ea4\u6613\u65f6\u95f4','\u65e5\u671f','\u65f6\u95f4','\u521b\u5efa\u65f6\u95f4','\u4ed8\u6b3e\u65f6\u95f4','\u53d1\u751f\u65f6\u95f4','\u5165\u8d26\u65f6\u95f4','\u8bb0\u8d26\u65e5\u671f','date','time'])) return 'date';
+      if (hasAny(h, ['\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u540d\u79f0','description','merchant','name'])) return 'merchant';
+      if (hasAny(h, ['\u5546\u54c1','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','\u7528\u9014','memo','remark','note'])) return 'note';
+      if (hasAny(h, ['\u91d1\u989d\u5143','\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
       if (hasAny(h, ['\u652f\u51fa','\u501f\u65b9','\u4ed8\u6b3e\u91d1\u989d','debit','expense'])) return 'expense';
       if (hasAny(h, ['\u6536\u5165','\u8d37\u65b9','\u6536\u6b3e\u91d1\u989d','credit','income'])) return 'income';
-      if (hasAny(h, ['\u6536\u652f','\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u65b9\u5411','type'])) return 'type';
+      if (hasAny(h, ['\u6536\u652f','\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u4ea4\u6613\u65b9\u5411','\u65b9\u5411','type'])) return 'type';
       if (hasAny(h, ['\u652f\u4ed8\u65b9\u5f0f','\u652f\u4ed8\u6e20\u9053','\u6e20\u9053','\u8d26\u6237','\u94f6\u884c\u5361','\u65b9\u5f0f','account','channel'])) return 'channel';
+      if (hasAny(h, ['\u5f53\u524d\u72b6\u6001','\u4ea4\u6613\u72b6\u6001','\u72b6\u6001','status'])) return 'status';
+      if (hasAny(h, ['\u4ea4\u6613\u5355\u53f7','\u8ba2\u5355\u53f7','\u5546\u6237\u5355\u53f7','order','id'])) return 'order';
       if (hasAny(h, ['\u5206\u7c7b','\u7c7b\u522b','category'])) return 'category';
       return '';
     }
@@ -468,13 +471,13 @@
 
     function findHeaderRow(rows) {
       let best = { index: -1, fields: {}, score: 0 };
-      rows.slice(0, 25).forEach((row, index) => {
+      rows.slice(0, 40).forEach((row, index) => {
         const fields = {};
         row.forEach((cell, col) => {
           const field = headerField(cell);
           if (field && fields[field] == null) fields[field] = col;
         });
-        const score = Object.keys(fields).length + (fields.amount != null || fields.income != null || fields.expense != null ? 2 : 0) + (fields.date != null ? 1 : 0);
+        const score = Object.keys(fields).length + (fields.amount != null || fields.income != null || fields.expense != null ? 2 : 0) + (fields.date != null ? 1 : 0) + (fields.type != null ? 1 : 0);
         if (score > best.score) best = { index, fields, score };
       });
       return best.score >= 3 ? best : null;
@@ -486,11 +489,12 @@
       const f = header.fields;
       return dedupeNewItems(rows.slice(header.index + 1).map(row => {
         const rowText = row.map(textOf).filter(Boolean).join(' ');
+        const statusText = f.status != null ? textOf(row[f.status]) : '';
         const income = f.income != null ? Math.abs(moneyNumber(row[f.income])) : 0;
         const expense = f.expense != null ? Math.abs(moneyNumber(row[f.expense])) : 0;
         let amount = f.amount != null ? moneyNumber(row[f.amount]) : 0;
         const typeText = f.type != null ? textOf(row[f.type]) : rowText;
-        let type = hasAny(typeText, ['\u6536\u5165','\u6536\u6b3e','\u5165\u8d26','\u9000\u6b3e','\u9000\u56de','\u8d37\u65b9','credit','income']) ? 'income' : 'expense';
+        let type = hasAny(typeText + statusText, ['\u6536\u5165','\u6536\u6b3e','\u5165\u8d26','\u9000\u6b3e','\u9000\u56de','\u8d37\u65b9','credit','income']) ? 'income' : 'expense';
         if (income && !expense) { amount = income; type = 'income'; }
         else if (expense && !income) { amount = expense; type = 'expense'; }
         else if (amount) {
@@ -498,15 +502,18 @@
           amount = Math.abs(amount);
         }
         if (!amount) return null;
-        const isRefund = hasAny(rowText, ['\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
+        const isRefund = hasAny(rowText + statusText, ['\u9000\u6b3e','\u5df2\u9000\u6b3e','\u5168\u989d\u9000\u6b3e','\u5df2\u5168\u989d\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
+        if (isRefund) type = 'income';
         const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
+        const noteParts = [textOf(row[f.note]), statusText, f.order != null ? textOf(row[f.order]) : ''].filter(Boolean);
+        const note = noteParts.length ? noteParts.join(' ? ') : rowText;
         const categoryText = f.category != null ? textOf(row[f.category]) : '';
         const category = categories.includes(categoryText) ? categoryText : detectCategory(rowText, isRefund);
         const channelText = f.channel != null ? textOf(row[f.channel]) : '';
         return {
           id: uid(), type, amount, category,
-          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText),
-          merchant, note: rowText, source,
+          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText + ' \u5fae\u4fe1'),
+          merchant, note, source,
           time: normalizeDate(textOf(row[f.date]) || rowText) + 'T12:00:00.000Z',
           isRefund, excluded: false, createdAt: new Date().toISOString()
         };
