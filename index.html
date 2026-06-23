@@ -114,7 +114,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger ? v2.0</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.0 ? &#24494;&#20449;&#36134;&#21333;&#34920;&#22836;&#20248;&#21270;</div></div>
+      <div><div class="label">Smart Ledger ? v2.1</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.1 ? &#25968;&#25454;&#28165;&#29702;&#19982;&#24494;&#20449;&#34920;&#22836;&#20248;&#21270;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -247,6 +247,11 @@
                 <input id="backupFile" type="file" accept="application/json,.json" />
               </label>
             </div>
+            <div class="grid" style="margin-top:10px">
+              <button class="danger" id="clearRangeBtn" type="button">&#28165;&#31354;&#24403;&#21069;&#26102;&#38388;&#33539;&#22260;</button>
+              <button class="danger" id="clearAllBtn" type="button">&#28165;&#31354;&#20840;&#37096;&#25968;&#25454;</button>
+            </div>
+            <p style="margin-top:8px">&#24314;&#35758;&#28165;&#31354;&#21069;&#20808;&#23548;&#20986;&#22791;&#20221;&#12290;&#8220;&#28165;&#31354;&#20840;&#37096;&#25968;&#25454;&#8221;&#20250;&#21024;&#38500;&#25152;&#26377;&#24050;&#23548;&#20837;&#35760;&#24405;&#21644;&#25269;&#28040;&#30830;&#35748;&#12290;</p>
           </div>
           <div class="guide-block">
             <h3>&#33021;&#20570;&#25104;&#23433;&#35013;&#21253;&#21527;&#65311;</h3>
@@ -693,11 +698,33 @@
         saveState();
         $('exportBackupBtn').onclick = exportBackup;
     $('backupFile').onchange = e => e.target.files[0] && importBackup(e.target.files[0]);
+    $('clearAllBtn').onclick = clearAllData;
+    $('clearRangeBtn').onclick = clearRangeData;
     render();
         alert('\u5907\u4efd\u5df2\u5bfc\u5165\uff0c\u7edf\u8ba1\u5df2\u66f4\u65b0\u3002');
       } catch (error) {
         alert('\u8fd9\u4e2a\u5907\u4efd\u6587\u4ef6\u65e0\u6cd5\u8bc6\u522b\uff0c\u8bf7\u786e\u8ba4\u662f\u672c App \u5bfc\u51fa\u7684 JSON \u5907\u4efd\u3002');
       }
+    }
+
+    function clearAllData() {
+      if (!confirm('\u786e\u5b9a\u8981\u6e05\u7a7a\u5168\u90e8\u8d26\u672c\u6570\u636e\u5417\uff1f\u8fd9\u4f1a\u5220\u9664\u6240\u6709\u5df2\u5bfc\u5165\u8bb0\u5f55\u548c\u62b5\u6d88\u786e\u8ba4\u3002')) return;
+      state = { items: [], offsets: [] };
+      localStorage.removeItem(storeKey);
+      saveState();
+      render();
+      alert('\u5df2\u6e05\u7a7a\u5168\u90e8\u8d26\u672c\u6570\u636e\u3002');
+    }
+
+    function clearRangeData() {
+      const range = getRange();
+      if (!confirm(`\u786e\u5b9a\u8981\u6e05\u7a7a\u5f53\u524d\u7edf\u8ba1\u8303\u56f4\uff08${range.label}\uff09\u5185\u7684\u8d26\u5355\u5417\uff1f`)) return;
+      const removeIds = new Set(state.items.filter(inRange).map(item => item.id));
+      state.items = state.items.filter(item => !removeIds.has(item.id));
+      state.offsets = state.offsets.filter(offset => !removeIds.has(offset.refundId) && !removeIds.has(offset.expenseId));
+      saveState();
+      render();
+      alert('\u5df2\u6e05\u7a7a\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002');
     }
 
     function showModule(name) {
