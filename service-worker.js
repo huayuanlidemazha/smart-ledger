@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-ledger-pwa-v7';
+const CACHE_NAME = 'smart-ledger-pwa-v8';
 const ASSETS = [
   './',
   './index.html',

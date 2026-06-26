@@ -118,7 +118,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger ? v2.2</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.2 ? &#24494;&#20449;&#25910;&#25903;&#21015;&#19982;&#25269;&#28040;&#20248;&#21270;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.3</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.3 &middot; &#24494;&#20449;&#25910;&#25903;&#21015;&#24378;&#21046;&#20248;&#20808;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -284,7 +284,7 @@
       <button class="nav-btn" type="button" data-module="import"><span>+</span>&#23548;&#20837;</button>
       <button class="nav-btn" type="button" data-module="offsets"><span>&#8617;</span>&#25269;&#28040;</button>
       <button class="nav-btn" type="button" data-module="records"><span>&#9776;</span>&#35760;&#24405;</button>
-      <button class="nav-btn" type="button" data-module="guide"><span>?</span>&#25351;&#21335;</button>
+      <button class="nav-btn" type="button" data-module="guide"><span>i</span>&#25351;&#21335;</button>
     </nav>
   </main>
 
@@ -464,9 +464,10 @@
       if (hasAny(h, ['\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u540d\u79f0','description','merchant','name'])) return 'merchant';
       if (hasAny(h, ['\u5546\u54c1','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','\u7528\u9014','memo','remark','note'])) return 'note';
       if (hasAny(h, ['\u91d1\u989d\u5143','\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
+      if (h === '\u6536\u652f' || h === '\u6536\u652f\u7c7b\u578b' || h === 'incomeexpense') return 'direction';
       if (hasAny(h, ['\u652f\u51fa','\u501f\u65b9','\u4ed8\u6b3e\u91d1\u989d','debit','expense'])) return 'expense';
       if (hasAny(h, ['\u6536\u5165','\u8d37\u65b9','\u6536\u6b3e\u91d1\u989d','credit','income'])) return 'income';
-      if (hasAny(h, ['\u6536\u652f','\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u4ea4\u6613\u65b9\u5411','\u65b9\u5411','type'])) return 'type';
+      if (hasAny(h, ['\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u4ea4\u6613\u65b9\u5411','\u65b9\u5411','type'])) return 'type';
       if (hasAny(h, ['\u652f\u4ed8\u65b9\u5f0f','\u652f\u4ed8\u6e20\u9053','\u6e20\u9053','\u8d26\u6237','\u94f6\u884c\u5361','\u65b9\u5f0f','account','channel'])) return 'channel';
       if (hasAny(h, ['\u5f53\u524d\u72b6\u6001','\u4ea4\u6613\u72b6\u6001','\u72b6\u6001','status'])) return 'status';
       if (hasAny(h, ['\u4ea4\u6613\u5355\u53f7','\u8ba2\u5355\u53f7','\u5546\u6237\u5355\u53f7','order','id'])) return 'order';
@@ -491,7 +492,7 @@
           const field = headerField(cell);
           if (field && fields[field] == null) fields[field] = col;
         });
-        const score = Object.keys(fields).length + (fields.amount != null || fields.income != null || fields.expense != null ? 2 : 0) + (fields.date != null ? 1 : 0) + (fields.type != null ? 1 : 0);
+        const score = Object.keys(fields).length + (fields.amount != null || fields.income != null || fields.expense != null ? 2 : 0) + (fields.date != null ? 1 : 0) + (fields.direction != null ? 2 : 0) + (fields.type != null ? 1 : 0);
         if (score > best.score) best = { index, fields, score };
       });
       return best.score >= 3 ? best : null;
@@ -507,20 +508,26 @@
         const income = f.income != null ? Math.abs(moneyNumber(row[f.income])) : 0;
         const expense = f.expense != null ? Math.abs(moneyNumber(row[f.expense])) : 0;
         let amount = f.amount != null ? moneyNumber(row[f.amount]) : 0;
+        const directionText = f.direction != null ? textOf(row[f.direction]) : '';
         const typeText = f.type != null ? textOf(row[f.type]) : rowText;
-        let type = hasAny(typeText, ['\u6536\u5165','\u6536','credit','income']) ? 'income' : 'expense';
-        if (hasAny(typeText, ['\u652f\u51fa','\u652f','debit','expense'])) type = 'expense';
+        let type = hasAny(typeText, ['\u6536\u5165','credit','income']) ? 'income' : 'expense';
+        if (directionText) {
+          if (directionText.includes('\u6536')) type = 'income';
+          if (directionText.includes('\u652f')) type = 'expense';
+        } else if (hasAny(typeText, ['\u652f\u51fa','debit','expense'])) {
+          type = 'expense';
+        }
         if (income && !expense) { amount = income; type = 'income'; }
         else if (expense && !income) { amount = expense; type = 'expense'; }
         else if (amount) {
-          type = amount < 0 || hasAny(typeText, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa','\u501f\u65b9','debit','expense']) ? 'expense' : type;
+          type = directionText ? type : (amount < 0 || hasAny(typeText, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa','\u501f\u65b9','debit','expense']) ? 'expense' : type);
           amount = Math.abs(amount);
         }
         if (!amount) return null;
         const isRefund = hasAny(rowText + statusText, ['\u9000\u6b3e','\u5df2\u9000\u6b3e','\u5168\u989d\u9000\u6b3e','\u5df2\u5168\u989d\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
         const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
         const noteParts = [textOf(row[f.note]), statusText, f.order != null ? textOf(row[f.order]) : ''].filter(Boolean);
-        const note = noteParts.length ? noteParts.join(' ? ') : rowText;
+        const note = noteParts.length ? noteParts.join(' \u00b7 ') : rowText;
         const categoryText = f.category != null ? textOf(row[f.category]) : '';
         const category = categories.includes(categoryText) ? categoryText : detectCategory(rowText, isRefund);
         const channelText = f.channel != null ? textOf(row[f.channel]) : '';
@@ -642,7 +649,7 @@
         const confirmedOffset = state.offsets.find(o => o.status === 'confirmed' && (o.refundId === x.id || o.expenseId === x.id));
         const offseted = !!confirmedOffset;
         const badge = offseted ? '<span class="offset-badge">\u5df2\u62b5\u6d88</span>' : '';
-        return `<div class="item ${x.excluded || offseted ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '\u2726'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} ? ${dateLabel(x.time)} ? ${x.source || '\u624b\u52a8'} ${badge}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>\u652f\u51fa</option><option value="income" ${x.type==='income'?'selected':''}>\u6536\u5165</option></select></div></div>`;
+        return `<div class="item ${x.excluded || offseted ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '\u2726'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} \u00b7 ${dateLabel(x.time)} \u00b7 ${x.source || '\u624b\u52a8'} ${badge}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>\u652f\u51fa</option><option value="income" ${x.type==='income'?'selected':''}>\u6536\u5165</option></select></div></div>`;
       }).join('') : '<div class="empty">\u8fd8\u6ca1\u6709\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002\u5bfc\u5165\u6587\u4ef6\u540e\uff0c\u4f1a\u5728\u8fd9\u91cc\u96c6\u4e2d\u6821\u5bf9\u3002</div>';
     }
 
