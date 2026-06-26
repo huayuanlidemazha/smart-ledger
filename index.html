@@ -94,6 +94,7 @@
     .money { font: 900 17px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap; text-align: right; }
     .money.out { color: var(--red); } .money.in { color: var(--green); }
     .edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .delete-btn { margin-top: 8px; padding: 11px 12px; color: var(--red); border-style: solid; }
     .empty { padding: 24px 18px 30px; color: var(--muted); text-align: center; font: 650 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
     .guide-list { padding: 4px 18px 18px; }
     .guide-block { margin-top: 12px; padding: 14px; border-radius: 20px; background: rgba(255,255,255,.48); border: 1px solid var(--line); }
@@ -121,7 +122,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.4</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.4 &middot; &#20132;&#26131;&#21333;&#21495;&#21435;&#37325;&#19982;&#25269;&#28040;&#35814;&#24773;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.5</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.5 &middot; &#37325;&#22797;&#35746;&#21333;&#35782;&#21035;&#19982;&#25163;&#21160;&#21024;&#38500;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -366,7 +367,7 @@
           excluded: false, createdAt: new Date().toISOString()
         });
       }
-      return dedupeNewItems(parsed);
+      return parsed;
     }
 
     function cleanMerchant(line) {
@@ -380,23 +381,40 @@
 
     function itemDedupeKey(item) {
       if (item.orderNo) return `order:${item.orderNo}`;
-      return '';
+      const date = item.time ? item.time.slice(0, 10) : '';
+      const merchant = (item.merchant || '').trim();
+      const note = (item.note || '').trim();
+      if (!date || !item.amount || !merchant) return '';
+      return `fallback:${date}|${item.type}|${Number(item.amount).toFixed(2)}|${merchant}|${note}`;
     }
 
     function dedupeNewItems(items) {
       const existingKeys = new Set(state.items.map(itemDedupeKey).filter(Boolean));
-      const seen = new Set();
       return items.filter(item => {
         const key = itemDedupeKey(item);
-        if (!key) return true;
-        if (existingKeys.has(key) || seen.has(key)) return false;
-        seen.add(key);
-        return true;
+        return !key || !existingKeys.has(key);
       });
     }
 
+    function extractOrderNo(text) {
+      const match = String(text || '').match(/\b\d{18,}\b/);
+      return match ? match[0] : '';
+    }
+
+    function normalizeItems() {
+      state.items = (state.items || []).map(item => ({
+        ...item,
+        amount: Number(item.amount || 0),
+        orderNo: item.orderNo || extractOrderNo(item.note)
+      }));
+      state.offsets = state.offsets || [];
+    }
+
+
     function addItems(items) {
-      if (!items.length) { alert('没有识别到新的账单记录'); return; }
+      normalizeItems();
+      items = dedupeNewItems(items);
+      if (!items.length) { alert('\u6ca1\u6709\u8bc6\u522b\u5230\u65b0\u7684\u8d26\u5355\u8bb0\u5f55\uff0c\u53ef\u80fd\u8fd9\u4e9b\u4ea4\u6613\u5355\u53f7\u5df2\u7ecf\u5bfc\u5165\u8fc7\u3002'); return; }
       state.items.unshift(...items);
       buildOffsetCandidates(items);
       selectedMonth = items[0].time.slice(0,7);
@@ -404,7 +422,7 @@
       if (periodMode === 'month') $('monthInput').value = selectedMonth;
       if (periodMode === 'year') $('yearInput').value = selectedYear;
       saveState(); render();
-      alert(`已识别 ${items.length} 笔。分类可以在下方直接修改；退款抵消需要你手动确认。`);
+      alert(`\u5df2\u8bc6\u522b ${items.length} \u7b14\u65b0\u8bb0\u5f55\u3002\u5df2\u5bfc\u5165\u8fc7\u7684\u91cd\u590d\u4ea4\u6613\u4f1a\u81ea\u52a8\u8df3\u8fc7\u3002`);
     }
 
     function buildOffsetCandidates(newItems) {
@@ -513,7 +531,7 @@
       const header = findHeaderRow(rows);
       if (!header) return [];
       const f = header.fields;
-      return dedupeNewItems(rows.slice(header.index + 1).map(row => {
+      return rows.slice(header.index + 1).map(row => {
         const rowText = row.map(textOf).filter(Boolean).join(' ');
         const statusText = f.status != null ? textOf(row[f.status]) : '';
         const income = f.income != null ? Math.abs(moneyNumber(row[f.income])) : 0;
@@ -537,7 +555,7 @@
         if (!amount) return null;
         const isRefund = hasAny(rowText + statusText, ['\u9000\u6b3e','\u5df2\u9000\u6b3e','\u5168\u989d\u9000\u6b3e','\u5df2\u5168\u989d\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
         const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
-        const orderNo = f.order != null ? textOf(row[f.order]) : '';
+        const orderNo = (f.order != null ? textOf(row[f.order]) : '') || extractOrderNo(rowText);
         const noteParts = [textOf(row[f.note]), statusText, orderNo].filter(Boolean);
         const note = noteParts.length ? noteParts.join(' \u00b7 ') : rowText;
         const categoryText = f.category != null ? textOf(row[f.category]) : '';
@@ -550,7 +568,7 @@
           time: normalizeDate(textOf(row[f.date]) || rowText) + 'T12:00:00.000Z',
           isRefund, excluded: false, createdAt: new Date().toISOString()
         };
-      }).filter(Boolean));
+      }).filter(Boolean);
     }
 
     async function parseXlsxWithSheetJS(file) {
@@ -564,7 +582,7 @@
         const structured = parseRowsByHeader(normalized, `Excel ${sheetName}`);
         if (structured.length) allItems.push(...structured);
       }
-      if (allItems.length) return dedupeNewItems(allItems);
+      if (allItems.length) return allItems;
       const sheetName = workbook.SheetNames[0];
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
       const text = rows.map(row => row.map(cell => textOf(cell)).filter(Boolean).join(' ')).filter(Boolean).join('\n');
@@ -674,7 +692,7 @@
         const confirmedOffset = state.offsets.find(o => o.status === 'confirmed' && (o.refundId === x.id || o.expenseId === x.id));
         const offseted = !!confirmedOffset;
         const badge = offseted ? '<span class="offset-badge">\u5df2\u62b5\u6d88</span>' : '';
-        return `<div class="item ${x.excluded || offseted ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '\u2726'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} \u00b7 ${dateLabel(x.time)} \u00b7 ${x.source || '\u624b\u52a8'} ${badge}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>\u652f\u51fa</option><option value="income" ${x.type==='income'?'selected':''}>\u6536\u5165</option></select></div></div>`;
+        return `<div class="item ${x.excluded || offseted ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '\u2726'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} \u00b7 ${dateLabel(x.time)} \u00b7 ${x.source || '\u624b\u52a8'} ${badge}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>\u652f\u51fa</option><option value="income" ${x.type==='income'?'selected':''}>\u6536\u5165</option></select></div><button class="secondary delete-btn" type="button" onclick="deleteItem('${x.id}')">\u5220\u9664\u6b64\u7b14</button></div>`;
       }).join('') : '<div class="empty">\u8fd8\u6ca1\u6709\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002\u5bfc\u5165\u6587\u4ef6\u540e\uff0c\u4f1a\u5728\u8fd9\u91cc\u96c6\u4e2d\u6821\u5bf9\u3002</div>';
     }
 
@@ -706,9 +724,19 @@
       buildOffsetCandidates([item]); saveState(); render();
     }
 
+    function deleteItem(id) {
+      const item = getItem(id);
+      if (!item) return;
+      if (!confirm(`\u786e\u5b9a\u5220\u9664\u8fd9\u7b14\u8bb0\u5f55\uff1a${item.merchant || ''} ${money(item.amount)}\uff1f`)) return;
+      state.items = state.items.filter(x => x.id !== id);
+      state.offsets = state.offsets.filter(o => o.refundId !== id && o.expenseId !== id);
+      saveState();
+      render();
+    }
+
     function confirmOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'confirmed'; saveState(); render(); } }
     function ignoreOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'ignored'; saveState(); render(); } }
-    window.confirmOffset = confirmOffset; window.ignoreOffset = ignoreOffset; window.updateItem = updateItem;
+    window.confirmOffset = confirmOffset; window.ignoreOffset = ignoreOffset; window.updateItem = updateItem; window.deleteItem = deleteItem;
 
     function dateLabel(time) { return new Date(time).toLocaleDateString('zh-CN', { month:'2-digit', day:'2-digit' }); }
     function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
