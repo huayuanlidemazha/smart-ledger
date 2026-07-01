@@ -57,6 +57,7 @@
     .section-title { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 8px; gap: 12px; }
     .period-tools { padding: 0 18px 16px; }
     .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 4px; border-radius: 999px; background: rgba(33,29,22,.07); margin-bottom: 10px; }
+    .segmented.two { grid-template-columns: repeat(2, 1fr); }
     .period-btn { border: 0; border-radius: 999px; padding: 10px 8px; background: transparent; color: var(--muted); font: 850 13px/1.1 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: none; }
     .period-btn.active { background: #fff8ec; color: var(--ink); box-shadow: 0 7px 18px rgba(58,42,21,.10); }
     .period-row { display: none; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -102,6 +103,8 @@
     .guide-block p, .guide-block li { color: var(--muted); font: 650 13px/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
     .guide-block p { margin: 0; }
     .guide-block ol, .guide-block ul { margin: 8px 0 0; padding-left: 20px; }
+    .chart-toolbar { padding: 0 18px 8px; }
+    .chart-toolbar .segmented { margin-bottom: 0; }
     .candidate { margin: 10px 0 0; padding: 13px; border-radius: 18px; background: rgba(60,110,143,.10); border: 1px solid rgba(60,110,143,.20); }
     .candidate b { display: block; font: 900 15px/1.3 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
     .candidate p { margin: 6px 0 10px; color: var(--muted); font: 650 13px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -122,7 +125,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.7</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.7 &middot; &#25353;&#28192;&#36947;&#21644;&#23548;&#20837;&#25209;&#27425;&#28165;&#29702;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9 &middot; &#25353;&#28192;&#36947;&#21644;&#23548;&#20837;&#25209;&#27425;&#28165;&#29702;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -161,7 +164,13 @@
       </section>
 
       <section class="card">
-        <div class="section-title"><h2>&#20998;&#31867;&#22270;</h2><span class="label">&#25269;&#28040;&#21518;</span></div>
+        <div class="section-title"><h2>&#20998;&#31867;&#22270;</h2><span class="label" id="chartLabel">&#25903;&#20986;&#35270;&#22270;</span></div>
+        <div class="chart-toolbar">
+          <div class="segmented two">
+            <button class="period-btn active" id="chartExpenseBtn" type="button">&#25903;&#20986;</button>
+            <button class="period-btn" id="chartIncomeBtn" type="button">&#25910;&#20837;</button>
+          </div>
+        </div>
         <canvas id="chart" width="640" height="330"></canvas>
       </section>
     </section>
@@ -290,6 +299,14 @@
                 <select id="clearBatchSelect"></select>
                 <button class="danger" id="clearBatchBtn" type="button">&#25353;&#23548;&#20837;&#25209;&#27425;&#28165;&#31354;</button>
               </div>
+              <div class="grid" style="margin-top:10px">
+                <input id="clearBatchStart" type="date" />
+                <input id="clearBatchEnd" type="date" />
+              </div>
+              <div class="grid" style="margin-top:10px">
+                <button class="danger" id="clearBatchRangeBtn" type="button">&#25353;&#23548;&#20837;&#26102;&#38388;&#28165;&#31354;</button>
+                <div></div>
+              </div>
             </div>
             <p style="margin-top:8px">&#24314;&#35758;&#28165;&#31354;&#21069;&#20808;&#23548;&#20986;&#22791;&#20221;&#12290;&#8220;&#28165;&#31354;&#20840;&#37096;&#25968;&#25454;&#8221;&#20250;&#21024;&#38500;&#25152;&#26377;&#24050;&#23548;&#20837;&#35760;&#24405;&#21644;&#25269;&#28040;&#30830;&#35748;&#12290;</p>
           </div>
@@ -326,13 +343,14 @@
 
   <script>
     const storeKey = 'smart-ledger-month-end-v2';
-    const categories = ['餐饮','交通','购物','红包','转账','工资','理财','退款','医疗','住房','娱乐','其他'];
+    const categories = ['餐饮','交通','生活','出借','医疗','工资','娱乐','转账','住房','其他'];
     const channels = ['微信','支付宝','银行卡','现金','其他'];
-    const symbols = { 餐饮:'🍜', 交通:'🚕', 购物:'🛍️', 红包:'🧧', 转账:'↔️', 工资:'💼', 理财:'📈', 退款:'↩️', 医疗:'💊', 住房:'🏠', 娱乐:'🎬', 其他:'✦' };
+    const symbols = { 餐饮:'🍜', 交通:'🚕', 生活:'🧺', 出借:'💸', 医疗:'💊', 工资:'💼', 娱乐:'🎬', 转账:'↔️', 住房:'🏠', 其他:'✦' };
     let state = JSON.parse(localStorage.getItem(storeKey) || '{"items":[],"offsets":[]}');
     if (!state.items) state.items = [];
     if (!state.offsets) state.offsets = [];
     let periodMode = 'month';
+    let chartMode = 'expense';
     let selectedMonth = new Date().toISOString().slice(0, 7);
     let selectedYear = new Date().getFullYear();
     let customStart = new Date().toISOString().slice(0, 10);
@@ -363,13 +381,13 @@
     }
 
     function detectCategory(text, isRefund) {
-      if (isRefund) return '退款';
-      if (/红包|微信红包/i.test(text)) return '红包';
+      if (isRefund) return '其他';
+      if (/红包|微信红包|转账|收款|付款/i.test(text)) return '转账';
       if (/餐|饭|咖啡|奶茶|外卖|美团|饿了么|麦当劳|肯德基|星巴克/i.test(text)) return '餐饮';
-      if (/地铁|公交|打车|滴滴|高铁|机票|加油|停车/i.test(text)) return '交通';
-      if (/淘宝|天猫|京东|拼多多|抖音商城|超市|购物|便利店/i.test(text)) return '购物';
+      if (/地铁|公交|打车|滴滴|高铁|机票|加油|停车|出租车|顺风车|高德|网约车|火车|动车|轮船|飞机/i.test(text)) return '交通';
+      if (/淘宝|天猫|京东|拼多多|抖音商城|超市|购物|便利店|日用|家居|生活|话费|水电|燃气|快递/i.test(text)) return '生活';
       if (/工资|薪资|奖金|报销/i.test(text)) return '工资';
-      if (/基金|股票|理财|利息|分红/i.test(text)) return '理财';
+      if (/借出|借给|出借|借款|借贷|还款|贷款/i.test(text)) return '出借';
       if (/房租|物业|水电|燃气|宽带/i.test(text)) return '住房';
       if (/医院|药|医保|挂号/i.test(text)) return '医疗';
       if (/电影|游戏|会员|演出|娱乐/i.test(text)) return '娱乐';
@@ -439,7 +457,8 @@
         amount: Number(item.amount || 0),
         orderNo: item.orderNo || extractOrderNo(item.note),
         importBatchId: item.importBatchId || 'legacy',
-        importBatchLabel: item.importBatchLabel || '\u65e7\u6570\u636e / \u672a\u5206\u6279\u6b21'
+        importBatchLabel: item.importBatchLabel || '\u65e7\u6570\u636e / \u672a\u5206\u6279\u6b21',
+        isRefund: item.isRefund || item.category === '\u9000\u6b3e' || /\u9000\u6b3e|\u9000\u56de|\u7ea2\u5305\u9000\u56de|\u539f\u8def\u9000|\u51b2\u6b63|\u64a4\u9500/.test(item.note || '')
       }));
       state.offsets = state.offsets || [];
     }
@@ -452,20 +471,23 @@
       const batchTime = new Date().toISOString();
       const batchId = `batch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const batchSource = items[0]?.source || '\u672a\u77e5\u6765\u6e90';
-      items = items.map(item => ({ ...item, importBatchId: batchId, importBatchAt: batchTime, importBatchLabel: `${batchSource} ? ${new Date(batchTime).toLocaleString('zh-CN')}` }));
+      const wasEmpty = state.items.length === 0;
+      items = items.map(item => ({ ...item, importBatchId: batchId, importBatchAt: batchTime, importBatchLabel: `${batchSource} · ${new Date(batchTime).toLocaleString('zh-CN')}` }));
       state.items.unshift(...items);
       buildOffsetCandidates(items);
-      selectedMonth = items[0].time.slice(0,7);
-      selectedYear = Number(items[0].time.slice(0,4));
-      if (periodMode === 'month') $('monthInput').value = selectedMonth;
-      if (periodMode === 'year') $('yearInput').value = selectedYear;
+      if (wasEmpty) {
+        selectedMonth = items[0].time.slice(0,7);
+        selectedYear = Number(items[0].time.slice(0,4));
+        if (periodMode === 'month') $('monthInput').value = selectedMonth;
+        if (periodMode === 'year') $('yearInput').value = selectedYear;
+      }
       saveState(); render();
       alert(`\u5df2\u8bc6\u522b ${items.length} \u7b14\u65b0\u8bb0\u5f55\u3002\u5df2\u5bfc\u5165\u8fc7\u7684\u91cd\u590d\u4ea4\u6613\u4f1a\u81ea\u52a8\u8df3\u8fc7\u3002`);
     }
 
     function buildOffsetCandidates(newItems) {
       const all = state.items;
-      const refunds = newItems.filter(x => x.type === 'income' && (x.isRefund || x.category === '\u9000\u6b3e' || /\u9000\u6b3e|\u9000\u56de|\u7ea2\u5305\u9000\u56de/.test(x.note)));
+      const refunds = newItems.filter(x => x.type === 'income' && (x.isRefund || /\u9000\u6b3e|\u9000\u56de|\u7ea2\u5305\u9000\u56de|\u539f\u8def\u9000|\u51b2\u6b63|\u64a4\u9500/.test(x.note)));
       for (const refund of refunds) {
         const candidates = all.filter(x =>
           x.type === 'expense' &&
@@ -694,8 +716,15 @@
       $('rangePill').textContent = range.label;
     }
 
+    function syncChartInputs() {
+      $('chartExpenseBtn')?.classList.toggle('active', chartMode === 'expense');
+      $('chartIncomeBtn')?.classList.toggle('active', chartMode === 'income');
+      $('chartLabel').textContent = chartMode === 'income' ? '收入视图' : '支出视图';
+    }
+
     function render() {
       syncPeriodInputs();
+      syncChartInputs();
       const t = totals();
       $('income').textContent = money(t.income);
       $('expense').textContent = money(t.expense);
@@ -703,7 +732,7 @@
       $('balance').textContent = money(t.income - t.expense);
       const data = rangeItems();
       $('countLabel').textContent = `${data.length} 笔`;
-      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount); renderDataManagement();
+      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount, chartMode); renderDataManagement();
     }
 
     function transactionDetail(item) {
@@ -737,24 +766,59 @@
       }).join('') : '<div class="empty">\u8fd8\u6ca1\u6709\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002\u5bfc\u5165\u6587\u4ef6\u540e\uff0c\u4f1a\u5728\u8fd9\u91cc\u96c6\u4e2d\u6821\u5bf9\u3002</div>';
     }
 
-    function renderChart(data) {
+    function fitText(ctx, text, maxWidth) {
+      if (ctx.measureText(text).width <= maxWidth) return text;
+      const ellipsis = '…';
+      let out = text;
+      while (out.length > 1 && ctx.measureText(out + ellipsis).width > maxWidth) out = out.slice(0, -1);
+      return out + ellipsis;
+    }
+
+    function renderChart(data, offsetAmount, mode) {
       const canvas = $('chart'), ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const dpr = window.devicePixelRatio || 1;
+      const cssWidth = canvas.getBoundingClientRect().width || 640;
       const offsetByExpense = {};
       for (const o of confirmedOffsets()) offsetByExpense[o.expenseId] = (offsetByExpense[o.expenseId] || 0) + o.amount;
+      const refundIds = new Set(confirmedOffsets().map(o => o.refundId));
       const totalsByCat = {};
-      data.filter(x => x.type === 'expense' && !x.excluded).forEach(x => {
-        const net = Math.max(0, x.amount - (offsetByExpense[x.id] || 0));
+      data.filter(x => x.type === mode && !x.excluded && (mode === 'expense' ? true : !refundIds.has(x.id))).forEach(x => {
+        const net = mode === 'expense' ? Math.max(0, x.amount - (offsetByExpense[x.id] || 0)) : x.amount;
         totalsByCat[x.category] = (totalsByCat[x.category] || 0) + net;
       });
-      const rows = Object.entries(totalsByCat).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]).slice(0, 6);
-      if (!rows.length) { ctx.fillStyle = '#756d60'; ctx.font = '28px Georgia'; ctx.textAlign = 'center'; ctx.fillText('本月还没有可统计支出', canvas.width / 2, 170); return; }
+      const rows = Object.entries(totalsByCat).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]).slice(0, 8);
+      const height = Math.max(220, 24 + rows.length * 42 + 18);
+      canvas.width = Math.round(cssWidth * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssWidth, height);
+      if (!rows.length) {
+        ctx.fillStyle = '#756d60';
+        ctx.font = '24px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(mode === 'income' ? '本月还没有可统计收入' : '本月还没有可统计支出', cssWidth / 2, 120);
+        return;
+      }
       const max = Math.max(...rows.map(r => r[1]));
+      const left = 16;
+      const labelW = 126;
+      const amountW = 82;
+      const barStart = left + labelW;
+      const barMax = Math.max(50, cssWidth - barStart - amountW - 18);
       rows.forEach(([cat, val], i) => {
-        const y = 40 + i * 46, barW = Math.max(18, val / max * 355);
-        ctx.fillStyle = '#211d16'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`${symbols[cat] || '✦'} ${cat}`, 28, y + 24);
-        ctx.fillStyle = i % 2 ? '#1f7459' : '#d39b35'; roundRect(ctx, 170, y, barW, 28, 14); ctx.fill();
-        ctx.fillStyle = '#211d16'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(money(val), 185 + barW, y + 22);
+        const y = 18 + i * 42;
+        const barW = Math.max(16, val / max * barMax);
+        ctx.fillStyle = '#211d16';
+        ctx.font = 'bold 18px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${symbols[cat] || '✦'} ${fitText(ctx, cat, labelW - 22)}`, left, y + 24);
+        ctx.fillStyle = mode === 'income' ? (i % 2 ? '#3c6e8f' : '#1f7459') : (i % 2 ? '#1f7459' : '#d39b35');
+        roundRect(ctx, barStart, y + 4, barW, 24, 12); ctx.fill();
+        ctx.fillStyle = '#211d16';
+        ctx.font = '900 15px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(fitText(ctx, money(val), amountW), cssWidth - 16, y + 23);
       });
     }
 
@@ -805,7 +869,7 @@
     function updateItem(id, field, value) {
       const item = getItem(id); if (!item) return;
       item[field] = value;
-      if (field === 'category') item.isRefund = value === '退款';
+      if (field === 'category') item.isRefund = item.isRefund || /退款|退回|冲正|撤销|红包退回|原路退/i.test(item.note || '') || value === '退款';
       buildOffsetCandidates([item]); saveState(); render();
     }
 
@@ -885,6 +949,12 @@
       setOptions('clearChannelSelect', groupedOptions('channel', '\u5176\u4ed6', '\u5176\u4ed6'), '\u6682\u65e0\u6e20\u9053\u6570\u636e');
       setOptions('clearSourceSelect', groupedOptions('source', '\u672a\u77e5\u6765\u6e90', '\u672a\u77e5\u6765\u6e90'), '\u6682\u65e0\u6765\u6e90\u6570\u636e');
       setOptions('clearBatchSelect', groupedOptions('importBatchId', 'legacy', '\u65e7\u6570\u636e / \u672a\u5206\u6279\u6b21'), '\u6682\u65e0\u6279\u6b21\u6570\u636e');
+      const batchDates = (state.items || [])
+        .map(item => item.importBatchAt ? item.importBatchAt.slice(0, 10) : '')
+        .filter(Boolean)
+        .sort();
+      if ($('clearBatchStart')) $('clearBatchStart').value = batchDates.length ? ($('clearBatchStart').value || batchDates[0]) : '';
+      if ($('clearBatchEnd')) $('clearBatchEnd').value = batchDates.length ? ($('clearBatchEnd').value || batchDates[batchDates.length - 1]) : '';
     }
 
     function clearByField(field, selectId, label) {
@@ -900,6 +970,35 @@
       saveState();
       render();
       alert('\u5df2\u6e05\u7a7a\u9009\u4e2d\u6570\u636e\u3002');
+    }
+
+    function clearByBatchRange() {
+      normalizeItems();
+      const start = $('clearBatchStart')?.value || '';
+      const end = $('clearBatchEnd')?.value || '';
+      if (!start || !end) {
+        alert('\u8bf7\u5148\u9009\u62e9\u5f00\u59cb\u548c\u7ed3\u675f\u65e5\u671f\u3002');
+        return;
+      }
+      if (start > end) {
+        alert('\u5f00\u59cb\u65e5\u671f\u4e0d\u80fd\u665a\u4e8e\u7ed3\u675f\u65e5\u671f\u3002');
+        return;
+      }
+      const removeIds = new Set(
+        state.items
+          .filter(item => item.importBatchAt && item.importBatchAt.slice(0, 10) >= start && item.importBatchAt.slice(0, 10) <= end)
+          .map(item => item.id)
+      );
+      if (!removeIds.size) {
+        alert('\u8fd9\u4e2a\u65f6\u95f4\u8303\u56f4\u5185\u6ca1\u6709\u53ef\u6e05\u7406\u7684\u6279\u6b21\u3002');
+        return;
+      }
+      if (!confirm(`\u786e\u5b9a\u8981\u6e05\u7a7a ${start} \u81f3 ${end} \u4e4b\u95f4\u7684\u5bfc\u5165\u6279\u6b21\u5417\uff1f`)) return;
+      state.items = state.items.filter(item => !removeIds.has(item.id));
+      state.offsets = state.offsets.filter(offset => !removeIds.has(offset.refundId) && !removeIds.has(offset.expenseId));
+      saveState();
+      render();
+      alert('\u5df2\u6e05\u7a7a\u6307\u5b9a\u65f6\u95f4\u8303\u56f4\u7684\u5bfc\u5165\u6279\u6b21\u3002');
     }
 
     function clearAllData() {
@@ -934,6 +1033,8 @@
     $('billFile').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
     $('imageFile').onchange = e => e.target.files.length && handleImages([...e.target.files]);
     document.querySelectorAll('.period-btn').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; render(); });
+    bind('chartExpenseBtn', 'click', () => { chartMode = 'expense'; render(); });
+    bind('chartIncomeBtn', 'click', () => { chartMode = 'income'; render(); });
     $('monthInput').onchange = e => { selectedMonth = e.target.value || selectedMonth; render(); };
     $('yearInput').onchange = e => { selectedYear = Number(e.target.value) || selectedYear; render(); };
     $('startDateInput').onchange = e => { customStart = e.target.value || customStart; if (customEnd < customStart) customEnd = customStart; render(); };
@@ -950,6 +1051,7 @@
     bind('clearChannelBtn', 'click', () => clearByField('channel', 'clearChannelSelect', '\u6e20\u9053'));
     bind('clearSourceBtn', 'click', () => clearByField('source', 'clearSourceSelect', '\u8d26\u5355\u6765\u6e90'));
     bind('clearBatchBtn', 'click', () => clearByField('importBatchId', 'clearBatchSelect', '\u5bfc\u5165\u6279\u6b21'));
+    bind('clearBatchRangeBtn', 'click', clearByBatchRange);
     bind('manualAddBtn', 'click', () => showManualForm(true));
     bind('cancelManualBtn', 'click', () => showManualForm(false));
     bind('saveManualBtn', 'click', saveManualItem);
