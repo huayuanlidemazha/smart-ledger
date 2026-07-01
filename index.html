@@ -122,7 +122,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.5</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.5 &middot; &#37325;&#22797;&#35746;&#21333;&#35782;&#21035;&#19982;&#25163;&#21160;&#21024;&#38500;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.7</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.7 &middot; &#25353;&#28192;&#36947;&#21644;&#23548;&#20837;&#25209;&#27425;&#28165;&#29702;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -200,7 +200,23 @@
 
     <section class="module" id="module-records">
       <section class="card">
-        <div class="section-title"><h2>&#35782;&#21035;&#35760;&#24405;</h2><span class="label" id="countLabel">0 &#31508;</span></div>
+        <div class="section-title"><h2>&#35782;&#21035;&#35760;&#24405;</h2><div class="row-actions"><button class="tiny" id="manualAddBtn" type="button">&#25163;&#21160;&#28155;&#21152;</button><span class="label" id="countLabel">0 &#31508;</span></div></div>
+        <div class="panel" id="manualForm" style="display:none">
+          <div class="grid">
+            <input id="manualDate" type="date" />
+            <input id="manualAmount" inputmode="decimal" placeholder="&#37329;&#39069;" />
+          </div>
+          <div class="grid">
+            <select id="manualType"><option value="expense">&#25903;&#20986;</option><option value="income">&#25910;&#20837;</option></select>
+            <select id="manualCategory"></select>
+          </div>
+          <div class="grid">
+            <select id="manualChannel"></select>
+            <input id="manualMerchant" placeholder="&#20132;&#26131;&#23545;&#26041; / &#21830;&#25143;" />
+          </div>
+          <div class="single"><input id="manualNote" placeholder="&#22791;&#27880;&#65292;&#21487;&#36873;" /></div>
+          <div class="grid"><button class="primary" id="saveManualBtn" type="button">&#20445;&#23384;&#35760;&#24405;</button><button class="secondary" id="cancelManualBtn" type="button">&#21462;&#28040;</button></div>
+        </div>
         <div class="list" id="list"></div>
       </section>
     </section>
@@ -258,6 +274,22 @@
             <div class="grid" style="margin-top:10px">
               <button class="danger" id="clearRangeBtn" type="button">&#28165;&#31354;&#24403;&#21069;&#26102;&#38388;&#33539;&#22260;</button>
               <button class="danger" id="clearAllBtn" type="button">&#28165;&#31354;&#20840;&#37096;&#25968;&#25454;</button>
+            </div>
+            <div class="guide-block" style="box-shadow:none;margin-top:12px">
+              <h3>&#31934;&#20934;&#28165;&#29702;</h3>
+              <p>&#22914;&#26524;&#21482;&#26159;&#26576;&#19968;&#20010;&#28192;&#36947;&#25110;&#26576;&#27425;&#23548;&#20837;&#20986;&#38169;&#65292;&#21487;&#20197;&#21482;&#28165;&#29702;&#37027;&#19968;&#37096;&#20998;&#12290;</p>
+              <div class="grid" style="margin-top:10px">
+                <select id="clearChannelSelect"></select>
+                <button class="danger" id="clearChannelBtn" type="button">&#25353;&#28192;&#36947;&#28165;&#31354;</button>
+              </div>
+              <div class="grid" style="margin-top:10px">
+                <select id="clearSourceSelect"></select>
+                <button class="danger" id="clearSourceBtn" type="button">&#25353;&#36134;&#21333;&#26469;&#28304;&#28165;&#31354;</button>
+              </div>
+              <div class="grid" style="margin-top:10px">
+                <select id="clearBatchSelect"></select>
+                <button class="danger" id="clearBatchBtn" type="button">&#25353;&#23548;&#20837;&#25209;&#27425;&#28165;&#31354;</button>
+              </div>
             </div>
             <p style="margin-top:8px">&#24314;&#35758;&#28165;&#31354;&#21069;&#20808;&#23548;&#20986;&#22791;&#20221;&#12290;&#8220;&#28165;&#31354;&#20840;&#37096;&#25968;&#25454;&#8221;&#20250;&#21024;&#38500;&#25152;&#26377;&#24050;&#23548;&#20837;&#35760;&#24405;&#21644;&#25269;&#28040;&#30830;&#35748;&#12290;</p>
           </div>
@@ -405,7 +437,9 @@
       state.items = (state.items || []).map(item => ({
         ...item,
         amount: Number(item.amount || 0),
-        orderNo: item.orderNo || extractOrderNo(item.note)
+        orderNo: item.orderNo || extractOrderNo(item.note),
+        importBatchId: item.importBatchId || 'legacy',
+        importBatchLabel: item.importBatchLabel || '\u65e7\u6570\u636e / \u672a\u5206\u6279\u6b21'
       }));
       state.offsets = state.offsets || [];
     }
@@ -415,6 +449,10 @@
       normalizeItems();
       items = dedupeNewItems(items);
       if (!items.length) { alert('\u6ca1\u6709\u8bc6\u522b\u5230\u65b0\u7684\u8d26\u5355\u8bb0\u5f55\uff0c\u53ef\u80fd\u8fd9\u4e9b\u4ea4\u6613\u5355\u53f7\u5df2\u7ecf\u5bfc\u5165\u8fc7\u3002'); return; }
+      const batchTime = new Date().toISOString();
+      const batchId = `batch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const batchSource = items[0]?.source || '\u672a\u77e5\u6765\u6e90';
+      items = items.map(item => ({ ...item, importBatchId: batchId, importBatchAt: batchTime, importBatchLabel: `${batchSource} ? ${new Date(batchTime).toLocaleString('zh-CN')}` }));
       state.items.unshift(...items);
       buildOffsetCandidates(items);
       selectedMonth = items[0].time.slice(0,7);
@@ -490,16 +528,19 @@
       const h = normalizeHeader(header);
       if (!h) return '';
       if (hasAny(h, ['\u4ea4\u6613\u65f6\u95f4','\u65e5\u671f','\u65f6\u95f4','\u521b\u5efa\u65f6\u95f4','\u4ed8\u6b3e\u65f6\u95f4','\u53d1\u751f\u65f6\u95f4','\u5165\u8d26\u65f6\u95f4','\u8bb0\u8d26\u65e5\u671f','date','time'])) return 'date';
-      if (hasAny(h, ['\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u540d\u79f0','description','merchant','name'])) return 'merchant';
-      if (hasAny(h, ['\u5546\u54c1','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','\u7528\u9014','memo','remark','note'])) return 'note';
-      if (hasAny(h, ['\u91d1\u989d\u5143','\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
+      if (h === '\u6536\u5165\u91d1\u989d' || h === '\u6536\u5165\u91d1\u989d\u5143' || h === 'incomeamount') return 'income';
+      if (h === '\u652f\u51fa\u91d1\u989d' || h === '\u652f\u51fa\u91d1\u989d\u5143' || h === 'expenseamount') return 'expense';
       if (h === '\u6536\u652f' || h === '\u6536\u652f\u7c7b\u578b' || h === 'incomeexpense') return 'direction';
+      if (hasAny(h, ['\u8ba2\u5355\u53f7','\u4ea4\u6613\u5355\u53f7','\u5546\u6237\u5355\u53f7','order','id'])) return 'order';
+      if (hasAny(h, ['\u4ea4\u6613\u8bf4\u660e','\u4ea4\u6613\u5bf9\u65b9','\u5546\u6237','\u5546\u5bb6','\u6536\u6b3e\u65b9','\u4ed8\u6b3e\u65b9','\u5bf9\u65b9','\u540d\u79f0','description','merchant','name'])) return 'merchant';
+      if (hasAny(h, ['\u5546\u54c1','\u6458\u8981','\u8bf4\u660e','\u5907\u6ce8','\u7528\u9014','memo','remark','note'])) return 'note';
       if (hasAny(h, ['\u652f\u51fa','\u501f\u65b9','\u4ed8\u6b3e\u91d1\u989d','debit','expense'])) return 'expense';
       if (hasAny(h, ['\u6536\u5165','\u8d37\u65b9','\u6536\u6b3e\u91d1\u989d','credit','income'])) return 'income';
+      if (hasAny(h, ['\u91d1\u989d\u5143','\u6536\u652f\u91d1\u989d','\u4ea4\u6613\u91d1\u989d','\u91d1\u989d','\u4eba\u6c11\u5e01','amount','money'])) return 'amount';
       if (hasAny(h, ['\u7c7b\u578b','\u4ea4\u6613\u7c7b\u578b','\u4ea4\u6613\u65b9\u5411','\u65b9\u5411','type'])) return 'type';
       if (hasAny(h, ['\u652f\u4ed8\u65b9\u5f0f','\u652f\u4ed8\u6e20\u9053','\u6e20\u9053','\u8d26\u6237','\u94f6\u884c\u5361','\u65b9\u5f0f','account','channel'])) return 'channel';
+      if (hasAny(h, ['\u64cd\u4f5c\u4eba\u6635\u79f0','\u64cd\u4f5c\u4eba\u59d3\u540d','operator'])) return 'operator';
       if (hasAny(h, ['\u5f53\u524d\u72b6\u6001','\u4ea4\u6613\u72b6\u6001','\u72b6\u6001','status'])) return 'status';
-      if (hasAny(h, ['\u4ea4\u6613\u5355\u53f7','\u8ba2\u5355\u53f7','\u5546\u6237\u5355\u53f7','order','id'])) return 'order';
       if (hasAny(h, ['\u5206\u7c7b','\u7c7b\u522b','category'])) return 'category';
       return '';
     }
@@ -556,14 +597,14 @@
         const isRefund = hasAny(rowText + statusText, ['\u9000\u6b3e','\u5df2\u9000\u6b3e','\u5168\u989d\u9000\u6b3e','\u5df2\u5168\u989d\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
         const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
         const orderNo = (f.order != null ? textOf(row[f.order]) : '') || extractOrderNo(rowText);
-        const noteParts = [textOf(row[f.note]), statusText, orderNo].filter(Boolean);
+        const noteParts = [textOf(row[f.note]), f.operator != null ? textOf(row[f.operator]) : '', statusText, orderNo].filter(Boolean);
         const note = noteParts.length ? noteParts.join(' \u00b7 ') : rowText;
         const categoryText = f.category != null ? textOf(row[f.category]) : '';
         const category = categories.includes(categoryText) ? categoryText : detectCategory(rowText, isRefund);
         const channelText = f.channel != null ? textOf(row[f.channel]) : '';
         return {
           id: uid(), type, amount, category,
-          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText + ' \u5fae\u4fe1'),
+          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText + ' \u652f\u4ed8\u5b9d'),
           merchant, note, source, orderNo,
           time: normalizeDate(textOf(row[f.date]) || rowText) + 'T12:00:00.000Z',
           isRefund, excluded: false, createdAt: new Date().toISOString()
@@ -662,7 +703,7 @@
       $('balance').textContent = money(t.income - t.expense);
       const data = rangeItems();
       $('countLabel').textContent = `${data.length} 笔`;
-      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount);
+      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount); renderDataManagement();
     }
 
     function transactionDetail(item) {
@@ -715,6 +756,50 @@
         ctx.fillStyle = i % 2 ? '#1f7459' : '#d39b35'; roundRect(ctx, 170, y, barW, 28, 14); ctx.fill();
         ctx.fillStyle = '#211d16'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(money(val), 185 + barW, y + 22);
       });
+    }
+
+    function initManualForm() {
+      const cat = $('manualCategory');
+      const ch = $('manualChannel');
+      if (cat && !cat.options.length) cat.innerHTML = categories.map(c => `<option>${c}</option>`).join('');
+      if (ch && !ch.options.length) ch.innerHTML = channels.map(c => `<option>${c}</option>`).join('');
+      if ($('manualDate')) $('manualDate').value = new Date().toISOString().slice(0, 10);
+    }
+
+    function showManualForm(show = true) {
+      initManualForm();
+      const form = $('manualForm');
+      if (form) form.style.display = show ? 'block' : 'none';
+    }
+
+    function saveManualItem() {
+      const amount = Number(String($('manualAmount').value || '').replace(',', '.'));
+      if (!amount || amount <= 0) { alert('\u8bf7\u586b\u5199\u6b63\u786e\u91d1\u989d\u3002'); return; }
+      const date = $('manualDate').value || new Date().toISOString().slice(0, 10);
+      const item = {
+        id: uid(),
+        type: $('manualType').value,
+        amount,
+        category: $('manualCategory').value || '\u5176\u4ed6',
+        channel: $('manualChannel').value || '\u5176\u4ed6',
+        merchant: $('manualMerchant').value.trim() || '\u624b\u52a8\u8bb0\u5f55',
+        note: $('manualNote').value.trim(),
+        source: '\u624b\u52a8',
+        orderNo: '',
+        time: `${date}T12:00:00.000Z`,
+        isRefund: $('manualCategory').value === '\u9000\u6b3e',
+        excluded: false,
+        createdAt: new Date().toISOString()
+      };
+      state.items.unshift(item);
+      buildOffsetCandidates([item]);
+      saveState();
+      selectedMonth = item.time.slice(0, 7);
+      $('manualAmount').value = '';
+      $('manualMerchant').value = '';
+      $('manualNote').value = '';
+      showManualForm(false);
+      render();
     }
 
     function updateItem(id, field, value) {
@@ -774,6 +859,49 @@
       }
     }
 
+    function setOptions(selectId, rows, emptyLabel) {
+      const select = $(selectId);
+      if (!select) return;
+      if (!rows.length) {
+        select.innerHTML = `<option value="">${emptyLabel}</option>`;
+        return;
+      }
+      select.innerHTML = rows.map(row => `<option value="${escapeHtml(row.value)}">${escapeHtml(row.label)} (${row.count})</option>`).join('');
+    }
+
+    function groupedOptions(field, legacyValue, legacyLabel) {
+      normalizeItems();
+      const map = new Map();
+      for (const item of state.items) {
+        const value = item[field] || legacyValue;
+        const label = field === 'importBatchId' ? (item.importBatchLabel || legacyLabel) : value;
+        if (!map.has(value)) map.set(value, { value, label, count: 0 });
+        map.get(value).count += 1;
+      }
+      return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    }
+
+    function renderDataManagement() {
+      setOptions('clearChannelSelect', groupedOptions('channel', '\u5176\u4ed6', '\u5176\u4ed6'), '\u6682\u65e0\u6e20\u9053\u6570\u636e');
+      setOptions('clearSourceSelect', groupedOptions('source', '\u672a\u77e5\u6765\u6e90', '\u672a\u77e5\u6765\u6e90'), '\u6682\u65e0\u6765\u6e90\u6570\u636e');
+      setOptions('clearBatchSelect', groupedOptions('importBatchId', 'legacy', '\u65e7\u6570\u636e / \u672a\u5206\u6279\u6b21'), '\u6682\u65e0\u6279\u6b21\u6570\u636e');
+    }
+
+    function clearByField(field, selectId, label) {
+      normalizeItems();
+      const select = $(selectId);
+      const value = select ? select.value : '';
+      if (!value) { alert('\u6682\u65e0\u53ef\u6e05\u7406\u6570\u636e\u3002'); return; }
+      const selectedText = select.options[select.selectedIndex]?.textContent || value;
+      if (!confirm(`\u786e\u5b9a\u8981\u6309${label}\u6e05\u7a7a\uff1a${selectedText}\uff1f`)) return;
+      const removeIds = new Set(state.items.filter(item => (item[field] || (field === 'importBatchId' ? 'legacy' : '')) === value).map(item => item.id));
+      state.items = state.items.filter(item => !removeIds.has(item.id));
+      state.offsets = state.offsets.filter(offset => !removeIds.has(offset.refundId) && !removeIds.has(offset.expenseId));
+      saveState();
+      render();
+      alert('\u5df2\u6e05\u7a7a\u9009\u4e2d\u6570\u636e\u3002');
+    }
+
     function clearAllData() {
       if (!confirm('\u786e\u5b9a\u8981\u6e05\u7a7a\u5168\u90e8\u8d26\u672c\u6570\u636e\u5417\uff1f\u8fd9\u4f1a\u5220\u9664\u6240\u6709\u5df2\u5bfc\u5165\u8bb0\u5f55\u548c\u62b5\u6d88\u786e\u8ba4\u3002')) return;
       state = { items: [], offsets: [] };
@@ -819,6 +947,12 @@
     bind('backupFile', 'change', e => e.target.files[0] && importBackup(e.target.files[0]));
     bind('clearAllBtn', 'click', clearAllData);
     bind('clearRangeBtn', 'click', clearRangeData);
+    bind('clearChannelBtn', 'click', () => clearByField('channel', 'clearChannelSelect', '\u6e20\u9053'));
+    bind('clearSourceBtn', 'click', () => clearByField('source', 'clearSourceSelect', '\u8d26\u5355\u6765\u6e90'));
+    bind('clearBatchBtn', 'click', () => clearByField('importBatchId', 'clearBatchSelect', '\u5bfc\u5165\u6279\u6b21'));
+    bind('manualAddBtn', 'click', () => showManualForm(true));
+    bind('cancelManualBtn', 'click', () => showManualForm(false));
+    bind('saveManualBtn', 'click', saveManualItem);
 
     document.addEventListener('pointerdown', e => {
       const button = e.target.closest('button');
@@ -834,6 +968,7 @@
       });
     }
 
+    initManualForm();
     render();
   </script>
 </body>
