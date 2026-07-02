@@ -97,6 +97,8 @@
     .edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     .delete-btn { margin-top: 8px; padding: 11px 12px; color: var(--red); border-style: solid; }
     .empty { padding: 24px 18px 30px; color: var(--muted); text-align: center; font: 650 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .list-more { padding: 6px 2px 2px; }
+    .list-more .hint { text-align: center; margin-bottom: 10px; }
     .guide-list { padding: 4px 18px 18px; }
     .guide-block { margin-top: 12px; padding: 14px; border-radius: 20px; background: rgba(255,255,255,.48); border: 1px solid var(--line); }
     .guide-block h3 { margin: 0 0 8px; font: 900 16px/1.25 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -125,7 +127,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.9.1</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.1 &middot; &#20462;&#22797;&#22270;&#34920;&#20999;&#25442;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9.2</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.2 &middot; &#35760;&#24405;&#21015;&#34920;&#21487;&#21152;&#36733;&#26356;&#22810;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -351,6 +353,8 @@
     if (!state.offsets) state.offsets = [];
     let periodMode = 'month';
     let chartMode = 'expense';
+    let recordsVisibleCount = 80;
+    const recordsPageSize = 80;
     let selectedMonth = new Date().toISOString().slice(0, 7);
     let selectedYear = new Date().getFullYear();
     let customStart = new Date().toISOString().slice(0, 10);
@@ -731,7 +735,8 @@
       $('offset').textContent = money(t.offsetAmount);
       $('balance').textContent = money(t.income - t.expense);
       const data = rangeItems();
-      $('countLabel').textContent = `${data.length} 笔`;
+      const shownCount = Math.min(data.length, recordsVisibleCount);
+      $('countLabel').textContent = shownCount < data.length ? `${shownCount}/${data.length} \u7b14` : `${data.length} \u7b14`;
       renderCandidates(); renderList(data); renderChart(data, t.offsetAmount, chartMode); renderDataManagement();
     }
 
@@ -758,12 +763,29 @@
     }
 
     function renderList(data) {
-      $('list').innerHTML = data.length ? data.slice(0, 80).map(x => {
+      const visible = data.slice(0, recordsVisibleCount);
+      const rows = visible.map(x => {
         const confirmedOffset = state.offsets.find(o => o.status === 'confirmed' && (o.refundId === x.id || o.expenseId === x.id));
         const offseted = !!confirmedOffset;
         const badge = offseted ? '<span class="offset-badge">\u5df2\u62b5\u6d88</span>' : '';
         return `<div class="item ${x.excluded || offseted ? 'muted' : ''}"><div class="item-head"><div class="icon">${symbols[x.category] || '\u2726'}</div><div class="meta"><div class="item-top"><b>${escapeHtml(x.merchant)}</b><div class="money ${x.type === 'income' ? 'in' : 'out'}">${x.type === 'income' ? '+' : '-'}${money(x.amount)}</div></div><span>${x.channel} \u00b7 ${dateLabel(x.time)} \u00b7 ${x.source || '\u624b\u52a8'} ${badge}</span></div></div><div class="item-note">${escapeHtml(x.note || '')}</div><div class="edit-row"><select onchange="updateItem('${x.id}','category',this.value)">${categories.map(c => `<option ${c===x.category?'selected':''}>${c}</option>`).join('')}</select><select onchange="updateItem('${x.id}','type',this.value)"><option value="expense" ${x.type==='expense'?'selected':''}>\u652f\u51fa</option><option value="income" ${x.type==='income'?'selected':''}>\u6536\u5165</option></select></div><button class="secondary delete-btn" type="button" onclick="deleteItem('${x.id}')">\u5220\u9664\u6b64\u7b14</button></div>`;
-      }).join('') : '<div class="empty">\u8fd8\u6ca1\u6709\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002\u5bfc\u5165\u6587\u4ef6\u540e\uff0c\u4f1a\u5728\u8fd9\u91cc\u96c6\u4e2d\u6821\u5bf9\u3002</div>';
+      }).join('');
+      const more = data.length > recordsVisibleCount ? `<div class="list-more"><p class="hint">\u5df2\u663e\u793a ${visible.length} / ${data.length} \u7b14\uff0c\u8fd8\u6709 ${data.length - visible.length} \u7b14\u672a\u663e\u793a\u3002</p><div class="grid"><button class="secondary" type="button" onclick="loadMoreRecords()">\u518d\u663e\u793a ${Math.min(recordsPageSize, data.length - visible.length)} \u7b14</button><button class="secondary" type="button" onclick="showAllRecords()">\u663e\u793a\u5168\u90e8</button></div></div>` : '';
+      $('list').innerHTML = data.length ? rows + more : '<div class="empty">\u8fd8\u6ca1\u6709\u5f53\u524d\u65f6\u95f4\u8303\u56f4\u5185\u7684\u8d26\u5355\u3002\u5bfc\u5165\u6587\u4ef6\u540e\uff0c\u4f1a\u5728\u8fd9\u91cc\u96c6\u4e2d\u6821\u5bf9\u3002</div>';
+    }
+
+    function resetRecordLimit() {
+      recordsVisibleCount = recordsPageSize;
+    }
+
+    function loadMoreRecords() {
+      recordsVisibleCount += recordsPageSize;
+      render();
+    }
+
+    function showAllRecords() {
+      recordsVisibleCount = rangeItems().length;
+      render();
     }
 
     function fitText(ctx, text, maxWidth) {
@@ -885,7 +907,7 @@
 
     function confirmOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'confirmed'; saveState(); render(); } }
     function ignoreOffset(id) { const o = state.offsets.find(x => x.id === id); if (o) { o.status = 'ignored'; saveState(); render(); } }
-    window.confirmOffset = confirmOffset; window.ignoreOffset = ignoreOffset; window.updateItem = updateItem; window.deleteItem = deleteItem;
+    window.confirmOffset = confirmOffset; window.ignoreOffset = ignoreOffset; window.updateItem = updateItem; window.deleteItem = deleteItem; window.loadMoreRecords = loadMoreRecords; window.showAllRecords = showAllRecords;
 
     function dateLabel(time) { return new Date(time).toLocaleDateString('zh-CN', { month:'2-digit', day:'2-digit' }); }
     function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -1032,13 +1054,13 @@
     $('sampleBtn').onclick = () => { $('bulkText').value = '06-03 12:31 微信支付 星巴克 -36.80\n06-04 19:08 支付宝 美团外卖 -28.00\n06-08 18:20 美团退款 +28.00\n06-10 09:12 银行 工资到账 +12000\n06-12 20:05 微信 发红包 -88.00\n06-13 10:40 微信 红包退回 +88.00'; };
     $('billFile').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
     $('imageFile').onchange = e => e.target.files.length && handleImages([...e.target.files]);
-    document.querySelectorAll('[data-period]').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; render(); });
+    document.querySelectorAll('[data-period]').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; resetRecordLimit(); render(); });
     bind('chartExpenseBtn', 'click', () => { chartMode = 'expense'; render(); });
     bind('chartIncomeBtn', 'click', () => { chartMode = 'income'; render(); });
-    $('monthInput').onchange = e => { selectedMonth = e.target.value || selectedMonth; render(); };
-    $('yearInput').onchange = e => { selectedYear = Number(e.target.value) || selectedYear; render(); };
-    $('startDateInput').onchange = e => { customStart = e.target.value || customStart; if (customEnd < customStart) customEnd = customStart; render(); };
-    $('endDateInput').onchange = e => { customEnd = e.target.value || customEnd; if (customEnd < customStart) customStart = customEnd; render(); };
+    $('monthInput').onchange = e => { selectedMonth = e.target.value || selectedMonth; resetRecordLimit(); render(); };
+    $('yearInput').onchange = e => { selectedYear = Number(e.target.value) || selectedYear; resetRecordLimit(); render(); };
+    $('startDateInput').onchange = e => { customStart = e.target.value || customStart; if (customEnd < customStart) customEnd = customStart; resetRecordLimit(); render(); };
+    $('endDateInput').onchange = e => { customEnd = e.target.value || customEnd; if (customEnd < customStart) customStart = customEnd; resetRecordLimit(); render(); };
     function bind(id, event, handler) {
       const el = $(id);
       if (el) el.addEventListener(event, handler);
