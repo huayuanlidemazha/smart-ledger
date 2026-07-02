@@ -125,7 +125,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.9</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9 &middot; &#25353;&#28192;&#36947;&#21644;&#23548;&#20837;&#25209;&#27425;&#28165;&#29702;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9.1</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.1 &middot; &#20462;&#22797;&#22270;&#34920;&#20999;&#25442;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -708,9 +708,9 @@
       $('yearInput').value = selectedYear;
       $('startDateInput').value = customStart;
       $('endDateInput').value = customEnd;
-      document.querySelectorAll('.period-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.period === periodMode));
+      document.querySelectorAll('[data-period]').forEach(btn => btn.classList.toggle('active', btn.dataset.period === periodMode));
       document.querySelectorAll('.period-row').forEach(row => row.classList.remove('active'));
-      $(`period-${periodMode}-row`).classList.add('active');
+      $(`period-${periodMode}-row`)?.classList.add('active');
       const range = getRange();
       $('rangeLabel').textContent = `\u5f53\u524d\u7edf\u8ba1\uff1a${range.label}`;
       $('rangePill').textContent = range.label;
@@ -1032,7 +1032,7 @@
     $('sampleBtn').onclick = () => { $('bulkText').value = '06-03 12:31 微信支付 星巴克 -36.80\n06-04 19:08 支付宝 美团外卖 -28.00\n06-08 18:20 美团退款 +28.00\n06-10 09:12 银行 工资到账 +12000\n06-12 20:05 微信 发红包 -88.00\n06-13 10:40 微信 红包退回 +88.00'; };
     $('billFile').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
     $('imageFile').onchange = e => e.target.files.length && handleImages([...e.target.files]);
-    document.querySelectorAll('.period-btn').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; render(); });
+    document.querySelectorAll('[data-period]').forEach(btn => btn.onclick = () => { periodMode = btn.dataset.period; render(); });
     bind('chartExpenseBtn', 'click', () => { chartMode = 'expense'; render(); });
     bind('chartIncomeBtn', 'click', () => { chartMode = 'income'; render(); });
     $('monthInput').onchange = e => { selectedMonth = e.target.value || selectedMonth; render(); };
