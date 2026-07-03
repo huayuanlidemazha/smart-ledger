@@ -127,7 +127,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.9.2</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.2 &middot; &#35760;&#24405;&#21015;&#34920;&#21487;&#21152;&#36733;&#26356;&#22810;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9.3</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.3 &middot; &#20248;&#21270;&#38134;&#34892;&#36134;&#21333;&#35782;&#21035;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -379,8 +379,17 @@
     function detectChannel(text) {
       if (/微信|零钱|财付通/i.test(text)) return '微信';
       if (/支付宝|花呗|余额宝/i.test(text)) return '支付宝';
-      if (/银行|信用卡|储蓄卡|招商|工商|建设|农业|中国银行|交通银行/i.test(text)) return '银行卡';
+      if (/银行|信用卡|储蓄卡|招商|工商|工行|建设|农业|中国银行|交通银行|借记账户|账户历史明细/i.test(text)) return '银行卡';
       if (/现金/i.test(text)) return '现金';
+      return '其他';
+    }
+
+    function normalizeChannel(channelText, rowText, source) {
+      const context = `${channelText || ''} ${rowText || ''} ${source || ''}`;
+      if (channels.includes(channelText) && channelText !== '\u5176\u4ed6') return channelText;
+      const detected = detectChannel(context);
+      if (detected !== '其他') return detected;
+      if (/快捷支付|网银|手机银行|银联|柜面|ATM|自助|其他/.test(context) && /银行|工商|工行|借记|账户|ICBC/i.test(context)) return '银行卡';
       return '其他';
     }
 
@@ -527,6 +536,13 @@
       }).join('\n');
     }
 
+    function parseDelimitedRowsArray(text) {
+      return text.split(/\r?\n/).map(row => row.trim()).filter(Boolean).map(row => {
+        if (row.includes('\t')) return row.split('\t').map(textOf);
+        return row.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(cell => textOf(cell.replace(/^\"|\"$/g, '')));
+      });
+    }
+
     function parseHtmlTable(text) {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const rows = [...doc.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim()).filter(Boolean).join(' ')).filter(Boolean);
@@ -534,12 +550,23 @@
       return doc.body ? doc.body.textContent : text;
     }
 
+    function parseHtmlTableRows(text) {
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      return [...doc.querySelectorAll('tr')]
+        .map(tr => [...tr.children].map(td => textOf(td.textContent)).filter(Boolean))
+        .filter(row => row.length);
+    }
+
     function parseBillFileText(text, fileName) {
       const name = (fileName || '').toLowerCase();
       if (name.endsWith('.html') || name.endsWith('.htm') || name.endsWith('.xls') || /^\s*<(!doctype|html|table)/i.test(text)) {
-        return parseLines(parseHtmlTable(text), 'Excel/\u8868\u683c');
+        const rows = parseHtmlTableRows(text);
+        const structured = rows.length ? parseRowsByHeader(rows, `Excel/\u8868\u683c ${fileName || ''}`) : [];
+        return structured.length ? structured : parseLines(parseHtmlTable(text), 'Excel/\u8868\u683c');
       }
-      return parseLines(parseDelimitedRows(text), '\u8d26\u5355\u6587\u4ef6');
+      const rows = parseDelimitedRowsArray(text);
+      const structured = rows.length ? parseRowsByHeader(rows, `\u8d26\u5355\u6587\u4ef6 ${fileName || ''}`) : [];
+      return structured.length ? structured : parseLines(parseDelimitedRows(text), '\u8d26\u5355\u6587\u4ef6');
     }
 
     function textOf(value) { return value == null ? '' : String(value).trim(); }
@@ -554,6 +581,7 @@
       const h = normalizeHeader(header);
       if (!h) return '';
       if (hasAny(h, ['\u4ea4\u6613\u65f6\u95f4','\u65e5\u671f','\u65f6\u95f4','\u521b\u5efa\u65f6\u95f4','\u4ed8\u6b3e\u65f6\u95f4','\u53d1\u751f\u65f6\u95f4','\u5165\u8d26\u65f6\u95f4','\u8bb0\u8d26\u65e5\u671f','date','time'])) return 'date';
+      if ((h.includes('\u6536\u5165') && h.includes('\u652f\u51fa') && h.includes('\u91d1\u989d')) || h === '\u6536\u5165\u652f\u51fa\u91d1\u989d' || h === '\u6536\u652f\u91d1\u989d') return 'amount';
       if (h === '\u6536\u5165\u91d1\u989d' || h === '\u6536\u5165\u91d1\u989d\u5143' || h === 'incomeamount') return 'income';
       if (h === '\u652f\u51fa\u91d1\u989d' || h === '\u652f\u51fa\u91d1\u989d\u5143' || h === 'expenseamount') return 'expense';
       if (h === '\u6536\u652f' || h === '\u6536\u652f\u7c7b\u578b' || h === 'incomeexpense') return 'direction';
@@ -572,7 +600,7 @@
     }
 
     function moneyNumber(value) {
-      const raw = textOf(value).replace(/,/g, '');
+      const raw = textOf(value).replace(/,/g, '').replace(/＋/g, '+').replace(/[－—]/g, '-');
       const negative = /^\(.*\)$/.test(raw) || hasAny(raw, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa']);
       const match = raw.match(/[+-]?\d+(?:\.\d{1,2})?/);
       if (!match) return 0;
@@ -603,6 +631,8 @@
         const statusText = f.status != null ? textOf(row[f.status]) : '';
         const income = f.income != null ? Math.abs(moneyNumber(row[f.income])) : 0;
         const expense = f.expense != null ? Math.abs(moneyNumber(row[f.expense])) : 0;
+        const amountText = f.amount != null ? textOf(row[f.amount]) : '';
+        const amountHasExplicitSign = /^[\s￥¥]*[+＋-－]/.test(amountText);
         let amount = f.amount != null ? moneyNumber(row[f.amount]) : 0;
         const directionText = f.direction != null ? textOf(row[f.direction]) : '';
         const typeText = f.type != null ? textOf(row[f.type]) : rowText;
@@ -616,21 +646,23 @@
         if (income && !expense) { amount = income; type = 'income'; }
         else if (expense && !income) { amount = expense; type = 'expense'; }
         else if (amount) {
-          type = directionText ? type : (amount < 0 || hasAny(typeText, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa','\u501f\u65b9','debit','expense']) ? 'expense' : type);
+          if (amountHasExplicitSign) type = amount > 0 ? 'income' : 'expense';
+          else type = directionText ? type : (amount < 0 || hasAny(typeText, ['\u652f\u51fa','\u4ed8\u6b3e','\u6d88\u8d39','\u6263\u6b3e','\u8f6c\u51fa','\u501f\u65b9','debit','expense']) ? 'expense' : type);
           amount = Math.abs(amount);
         }
         if (!amount) return null;
         const isRefund = hasAny(rowText + statusText, ['\u9000\u6b3e','\u5df2\u9000\u6b3e','\u5168\u989d\u9000\u6b3e','\u5df2\u5168\u989d\u9000\u6b3e','\u9000\u56de','\u51b2\u6b63','\u64a4\u9500','\u7ea2\u5305\u9000\u56de','\u539f\u8def\u9000']);
-        const merchant = textOf(row[f.merchant]) || cleanMerchant(rowText);
-        const orderNo = (f.order != null ? textOf(row[f.order]) : '') || extractOrderNo(rowText);
-        const noteParts = [textOf(row[f.note]), f.operator != null ? textOf(row[f.operator]) : '', statusText, orderNo].filter(Boolean);
+        const summaryText = f.note != null ? textOf(row[f.note]) : '';
+        const merchant = textOf(row[f.merchant]) || summaryText || cleanMerchant(rowText);
+        const orderNo = f.order != null ? textOf(row[f.order]) : '';
+        const noteParts = [summaryText, f.operator != null ? textOf(row[f.operator]) : '', statusText, orderNo].filter(Boolean);
         const note = noteParts.length ? noteParts.join(' \u00b7 ') : rowText;
         const categoryText = f.category != null ? textOf(row[f.category]) : '';
         const category = categories.includes(categoryText) ? categoryText : detectCategory(rowText, isRefund);
         const channelText = f.channel != null ? textOf(row[f.channel]) : '';
         return {
           id: uid(), type, amount, category,
-          channel: channels.includes(channelText) ? channelText : detectChannel(channelText + ' ' + rowText + ' \u652f\u4ed8\u5b9d'),
+          channel: normalizeChannel(channelText, rowText, source),
           merchant, note, source, orderNo,
           time: normalizeDate(textOf(row[f.date]) || rowText) + 'T12:00:00.000Z',
           isRefund, excluded: false, createdAt: new Date().toISOString()
@@ -646,7 +678,7 @@
       for (const sheetName of workbook.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
         const normalized = rows.map(row => row.map(textOf));
-        const structured = parseRowsByHeader(normalized, `Excel ${sheetName}`);
+        const structured = parseRowsByHeader(normalized, `Excel ${file.name || ''} ${sheetName}`);
         if (structured.length) allItems.push(...structured);
       }
       if (allItems.length) return allItems;
@@ -658,13 +690,16 @@
 
     async function handleFile(file) {
       const name = (file.name || '').toLowerCase();
-      if (name.endsWith('.xlsx')) {
+      if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
         try {
           addItems(await parseXlsxWithSheetJS(file));
+          return;
         } catch (error) {
-          alert('\u8fd9\u4e2a .xlsx \u6587\u4ef6\u6682\u65f6\u65e0\u6cd5\u89e3\u6790\u3002\u8bf7\u786e\u8ba4 SheetJS \u5df2\u6b63\u786e\u52a0\u8f7d\uff0c\u6216\u5c06\u6587\u4ef6\u53e6\u5b58\u4e3a CSV \u540e\u518d\u5bfc\u5165\u3002');
+          if (name.endsWith('.xlsx')) {
+            alert('\u8fd9\u4e2a .xlsx \u6587\u4ef6\u6682\u65f6\u65e0\u6cd5\u89e3\u6790\u3002\u8bf7\u786e\u8ba4 SheetJS \u5df2\u6b63\u786e\u52a0\u8f7d\uff0c\u6216\u5c06\u6587\u4ef6\u53e6\u5b58\u4e3a CSV \u540e\u518d\u5bfc\u5165\u3002');
+            return;
+          }
         }
-        return;
       }
       const text = await file.text();
       addItems(parseBillFileText(text, file.name));
