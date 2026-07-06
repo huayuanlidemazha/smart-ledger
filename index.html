@@ -127,7 +127,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.9.3</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.3 &middot; &#20248;&#21270;&#38134;&#34892;&#36134;&#21333;&#35782;&#21035;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9.4</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.4 &middot; &#26032;&#22686;&#26102;&#38388;&#20998;&#24067;&#22270;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -174,6 +174,11 @@
           </div>
         </div>
         <canvas id="chart" width="640" height="330"></canvas>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>&#26102;&#38388;&#20998;&#24067;&#22270;</h2><span class="label" id="timeChartLabel">&#25903;&#20986;&#26102;&#38388;</span></div>
+        <canvas id="timeChart" width="640" height="360"></canvas>
       </section>
     </section>
 
@@ -348,6 +353,7 @@
     const categories = ['餐饮','交通','生活','出借','医疗','工资','娱乐','转账','住房','其他'];
     const channels = ['微信','支付宝','银行卡','现金','其他'];
     const symbols = { 餐饮:'🍜', 交通:'🚕', 生活:'🧺', 出借:'💸', 医疗:'💊', 工资:'💼', 娱乐:'🎬', 转账:'↔️', 住房:'🏠', 其他:'✦' };
+    const categoryColors = { 餐饮:'#d39b35', 交通:'#3c6e8f', 生活:'#7f9f55', 出借:'#8d6cc9', 医疗:'#b84d37', 工资:'#1f7459', 娱乐:'#c2644a', 转账:'#5f7fb2', 住房:'#8a6b49', 其他:'#756d60' };
     let state = JSON.parse(localStorage.getItem(storeKey) || '{"items":[],"offsets":[]}');
     if (!state.items) state.items = [];
     if (!state.offsets) state.offsets = [];
@@ -759,6 +765,7 @@
       $('chartExpenseBtn')?.classList.toggle('active', chartMode === 'expense');
       $('chartIncomeBtn')?.classList.toggle('active', chartMode === 'income');
       $('chartLabel').textContent = chartMode === 'income' ? '收入视图' : '支出视图';
+      $('timeChartLabel').textContent = chartMode === 'income' ? '收入时间' : '支出时间';
     }
 
     function render() {
@@ -772,7 +779,7 @@
       const data = rangeItems();
       const shownCount = Math.min(data.length, recordsVisibleCount);
       $('countLabel').textContent = shownCount < data.length ? `${shownCount}/${data.length} \u7b14` : `${data.length} \u7b14`;
-      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount, chartMode); renderDataManagement();
+      renderCandidates(); renderList(data); renderChart(data, t.offsetAmount, chartMode); renderTimeChart(data, chartMode); renderDataManagement();
     }
 
     function transactionDetail(item) {
@@ -876,6 +883,126 @@
         ctx.font = '900 15px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(fitText(ctx, money(val), amountW), cssWidth - 16, y + 23);
+      });
+    }
+
+    function dayNumber(date) {
+      return Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000);
+    }
+
+    function dateFromDayNumber(day) {
+      return new Date(day * 86400000).toISOString().slice(0, 10);
+    }
+
+    function timeBucketsForRange() {
+      const range = getRange();
+      const startDay = dayNumber(range.start);
+      const endDay = dayNumber(range.end);
+      const dayCount = Math.max(1, endDay - startDay + 1);
+      const byMonth = periodMode === 'year' || dayCount > 62;
+      const buckets = [];
+      if (byMonth) {
+        const start = range.start.slice(0, 7);
+        const end = range.end.slice(0, 7);
+        let y = Number(start.slice(0, 4));
+        let m = Number(start.slice(5, 7));
+        while (`${y}-${String(m).padStart(2, '0')}` <= end) {
+          const key = `${y}-${String(m).padStart(2, '0')}`;
+          buckets.push({ key, label: `${String(m).padStart(2, '0')}\u6708`, cats: {}, total: 0 });
+          m += 1;
+          if (m > 12) { m = 1; y += 1; }
+        }
+        return { buckets, mode: 'month' };
+      }
+      for (let day = startDay; day <= endDay; day += 1) {
+        const date = dateFromDayNumber(day);
+        buckets.push({ key: date, label: date.slice(5), cats: {}, total: 0 });
+      }
+      return { buckets, mode: 'day' };
+    }
+
+    function chartItemsForMode(data, mode) {
+      const offsetByExpense = {};
+      const refundIds = new Set();
+      for (const o of confirmedOffsets()) {
+        offsetByExpense[o.expenseId] = (offsetByExpense[o.expenseId] || 0) + o.amount;
+        refundIds.add(o.refundId);
+      }
+      return data.filter(x => x.type === mode && !x.excluded && (mode === 'expense' ? true : !refundIds.has(x.id))).map(x => ({
+        ...x,
+        chartAmount: mode === 'expense' ? Math.max(0, Number(x.amount || 0) - (offsetByExpense[x.id] || 0)) : Number(x.amount || 0)
+      })).filter(x => x.chartAmount > 0);
+    }
+
+    function renderTimeChart(data, mode) {
+      const canvas = $('timeChart'), ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const cssWidth = canvas.getBoundingClientRect().width || 640;
+      const { buckets, mode: bucketMode } = timeBucketsForRange();
+      const map = new Map(buckets.map(bucket => [bucket.key, bucket]));
+      for (const item of chartItemsForMode(data, mode)) {
+        const key = bucketMode === 'month' ? item.time.slice(0, 7) : item.time.slice(0, 10);
+        const bucket = map.get(key);
+        if (!bucket) continue;
+        const cat = categories.includes(item.category) ? item.category : '\u5176\u4ed6';
+        bucket.cats[cat] = (bucket.cats[cat] || 0) + item.chartAmount;
+        bucket.total += item.chartAmount;
+      }
+      const rows = buckets.filter(bucket => bucket.total > 0);
+      const activeCats = categories.filter(cat => rows.some(row => row.cats[cat] > 0));
+      const legendRows = Math.ceil(Math.max(1, activeCats.length) / 3);
+      const height = Math.max(230, 48 + rows.length * 36 + legendRows * 22 + 26);
+      canvas.width = Math.round(cssWidth * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssWidth, height);
+      if (!rows.length) {
+        ctx.fillStyle = '#756d60';
+        ctx.font = '22px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(mode === 'income' ? '当前时间段还没有收入分布' : '当前时间段还没有支出分布', cssWidth / 2, 120);
+        return;
+      }
+      const left = 16;
+      const labelW = bucketMode === 'month' ? 52 : 58;
+      const amountW = 76;
+      const barStart = left + labelW;
+      const barMax = Math.max(70, cssWidth - barStart - amountW - 18);
+      const max = Math.max(...rows.map(row => row.total));
+      rows.forEach((row, i) => {
+        const y = 18 + i * 36;
+        ctx.fillStyle = '#211d16';
+        ctx.font = '800 14px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(row.label, left, y + 22);
+        let x = barStart;
+        const totalW = Math.max(18, row.total / max * barMax);
+        const cats = activeCats.filter(cat => row.cats[cat] > 0);
+        cats.forEach((cat, index) => {
+          const w = index === cats.length - 1 ? Math.max(2, barStart + totalW - x) : Math.max(2, row.cats[cat] / row.total * totalW);
+          ctx.fillStyle = categoryColors[cat] || '#756d60';
+          roundRect(ctx, x, y + 5, w, 22, Math.min(index === 0 || index === cats.length - 1 ? 11 : 2, w / 2));
+          ctx.fill();
+          x += w;
+        });
+        ctx.fillStyle = '#211d16';
+        ctx.font = '900 13px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(fitText(ctx, money(row.total), amountW), cssWidth - 16, y + 22);
+      });
+      const legendTop = 28 + rows.length * 36;
+      activeCats.forEach((cat, i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const x = left + col * Math.max(88, (cssWidth - 32) / 3);
+        const y = legendTop + row * 22;
+        ctx.fillStyle = categoryColors[cat] || '#756d60';
+        roundRect(ctx, x, y, 12, 12, 6); ctx.fill();
+        ctx.fillStyle = '#756d60';
+        ctx.font = '800 12px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(fitText(ctx, cat, 62), x + 17, y + 11);
       });
     }
 
