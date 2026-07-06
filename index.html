@@ -127,7 +127,7 @@
 <body>
   <main class="app">
     <header>
-      <div><div class="label">Smart Ledger &middot; v2.9.4</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.4 &middot; &#26032;&#22686;&#26102;&#38388;&#20998;&#24067;&#22270;</div></div>
+      <div><div class="label">Smart Ledger &middot; v2.9.5</div><h1>&#26234;&#33021;<br>&#36134;&#26412;</h1><div class="hint">v2.9.5 &middot; &#25913;&#20026;&#36235;&#21183;&#25240;&#32447;&#22270;</div></div>
       <div class="month-pill" id="rangePill">&#26412;&#26376;</div>
     </header>
 
@@ -177,7 +177,7 @@
       </section>
 
       <section class="card">
-        <div class="section-title"><h2>&#26102;&#38388;&#20998;&#24067;&#22270;</h2><span class="label" id="timeChartLabel">&#25903;&#20986;&#26102;&#38388;</span></div>
+        <div class="section-title"><h2>&#36235;&#21183;&#25240;&#32447;&#22270;</h2><span class="label" id="timeChartLabel">&#25903;&#20986;&#36235;&#21183;</span></div>
         <canvas id="timeChart" width="640" height="360"></canvas>
       </section>
     </section>
@@ -765,7 +765,7 @@
       $('chartExpenseBtn')?.classList.toggle('active', chartMode === 'expense');
       $('chartIncomeBtn')?.classList.toggle('active', chartMode === 'income');
       $('chartLabel').textContent = chartMode === 'income' ? '收入视图' : '支出视图';
-      $('timeChartLabel').textContent = chartMode === 'income' ? '收入时间' : '支出时间';
+      $('timeChartLabel').textContent = chartMode === 'income' ? '收入趋势' : '支出趋势';
     }
 
     function render() {
@@ -948,54 +948,83 @@
         bucket.cats[cat] = (bucket.cats[cat] || 0) + item.chartAmount;
         bucket.total += item.chartAmount;
       }
-      const rows = buckets.filter(bucket => bucket.total > 0);
-      const activeCats = categories.filter(cat => rows.some(row => row.cats[cat] > 0));
+      const activeCats = categories
+        .map(cat => ({ cat, total: buckets.reduce((sum, bucket) => sum + (bucket.cats[cat] || 0), 0) }))
+        .filter(x => x.total > 0)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+        .map(x => x.cat);
       const legendRows = Math.ceil(Math.max(1, activeCats.length) / 3);
-      const height = Math.max(230, 48 + rows.length * 36 + legendRows * 22 + 26);
+      const height = 292 + legendRows * 22;
       canvas.width = Math.round(cssWidth * dpr);
       canvas.height = Math.round(height * dpr);
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssWidth, height);
-      if (!rows.length) {
+      if (!activeCats.length) {
         ctx.fillStyle = '#756d60';
         ctx.font = '22px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(mode === 'income' ? '当前时间段还没有收入分布' : '当前时间段还没有支出分布', cssWidth / 2, 120);
+        ctx.fillText(mode === 'income' ? '当前时间段还没有收入趋势' : '当前时间段还没有支出趋势', cssWidth / 2, 120);
         return;
       }
-      const left = 16;
-      const labelW = bucketMode === 'month' ? 52 : 58;
-      const amountW = 76;
-      const barStart = left + labelW;
-      const barMax = Math.max(70, cssWidth - barStart - amountW - 18);
-      const max = Math.max(...rows.map(row => row.total));
-      rows.forEach((row, i) => {
-        const y = 18 + i * 36;
-        ctx.fillStyle = '#211d16';
-        ctx.font = '800 14px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(row.label, left, y + 22);
-        let x = barStart;
-        const totalW = Math.max(18, row.total / max * barMax);
-        const cats = activeCats.filter(cat => row.cats[cat] > 0);
-        cats.forEach((cat, index) => {
-          const w = index === cats.length - 1 ? Math.max(2, barStart + totalW - x) : Math.max(2, row.cats[cat] / row.total * totalW);
-          ctx.fillStyle = categoryColors[cat] || '#756d60';
-          roundRect(ctx, x, y + 5, w, 22, Math.min(index === 0 || index === cats.length - 1 ? 11 : 2, w / 2));
-          ctx.fill();
-          x += w;
-        });
-        ctx.fillStyle = '#211d16';
-        ctx.font = '900 13px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(fitText(ctx, money(row.total), amountW), cssWidth - 16, y + 22);
+      const plotLeft = 44;
+      const plotRight = cssWidth - 18;
+      const plotTop = 22;
+      const plotBottom = 218;
+      const plotW = Math.max(80, plotRight - plotLeft);
+      const plotH = plotBottom - plotTop;
+      const max = Math.max(1, ...activeCats.flatMap(cat => buckets.map(bucket => bucket.cats[cat] || 0)));
+      const niceMax = Math.ceil(max / Math.pow(10, Math.max(0, String(Math.floor(max)).length - 1))) * Math.pow(10, Math.max(0, String(Math.floor(max)).length - 1));
+      ctx.strokeStyle = 'rgba(33,29,22,.12)';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#756d60';
+      ctx.font = '800 11px ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 3; i += 1) {
+        const value = niceMax * (3 - i) / 3;
+        const y = plotTop + i * plotH / 3;
+        ctx.beginPath();
+        ctx.moveTo(plotLeft, y);
+        ctx.lineTo(plotRight, y);
+        ctx.stroke();
+        ctx.fillText(value ? money(value).replace('¥', '') : '0', plotLeft - 6, y + 4);
+      }
+      const step = Math.max(1, Math.ceil(buckets.length / 5));
+      ctx.textAlign = 'center';
+      buckets.forEach((bucket, i) => {
+        if (i !== 0 && i !== buckets.length - 1 && i % step !== 0) return;
+        const x = plotLeft + (buckets.length === 1 ? plotW / 2 : i / (buckets.length - 1) * plotW);
+        ctx.fillText(bucket.label, x, plotBottom + 18);
       });
-      const legendTop = 28 + rows.length * 36;
+      activeCats.forEach(cat => {
+        const color = categoryColors[cat] || '#756d60';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        buckets.forEach((bucket, i) => {
+          const value = bucket.cats[cat] || 0;
+          const x = plotLeft + (buckets.length === 1 ? plotW / 2 : i / (buckets.length - 1) * plotW);
+          const y = plotBottom - value / niceMax * plotH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        buckets.forEach((bucket, i) => {
+          const value = bucket.cats[cat] || 0;
+          if (!value) return;
+          const x = plotLeft + (buckets.length === 1 ? plotW / 2 : i / (buckets.length - 1) * plotW);
+          const y = plotBottom - value / niceMax * plotH;
+          ctx.fillStyle = '#fff8ec';
+          ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+        });
+      });
+      const legendTop = plotBottom + 36;
       activeCats.forEach((cat, i) => {
         const col = i % 3;
         const row = Math.floor(i / 3);
-        const x = left + col * Math.max(88, (cssWidth - 32) / 3);
+        const x = 16 + col * Math.max(88, (cssWidth - 32) / 3);
         const y = legendTop + row * 22;
         ctx.fillStyle = categoryColors[cat] || '#756d60';
         roundRect(ctx, x, y, 12, 12, 6); ctx.fill();
